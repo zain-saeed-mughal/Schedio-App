@@ -1,6 +1,9 @@
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: assets/images/schedio-logo.jpg
+  image_path: assets/icon/app_icon.png
+  image_path_android: assets/icon/app_icon_android.png
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: assets/icon/app_icon_android_foreground.png
   remove_alpha_ios: true
   min_sdk_android: 23

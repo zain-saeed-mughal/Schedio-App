@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'app/shell.dart';
+import 'app/splash.dart';
+import 'core/models.dart';
 import 'core/providers.dart';
 import 'core/widgets.dart';
 import 'features/authentication/auth_screen.dart';
@@ -28,6 +30,7 @@ class SchedioApp extends ConsumerStatefulWidget {
 class _SchedioAppState extends ConsumerState<SchedioApp>
     with WidgetsBindingObserver {
   final theme = schedioTheme();
+  bool splashDone = false;
 
   @override
   void initState() {
@@ -53,6 +56,30 @@ class _SchedioAppState extends ConsumerState<SchedioApp>
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
+    final app = buildApp(auth);
+    return MediaQuery.fromView(
+      view: View.of(context),
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: Theme(
+          data: theme,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              app,
+              if (!splashDone)
+                AnimatedSplash(
+                  ready: !auth.isLoading,
+                  onFinished: () => setState(() => splashDone = true),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget buildApp(AsyncValue<Account?> auth) {
     if (auth.value == null || auth.hasError) {
       return MaterialApp(
         title: 'Schedio',
@@ -99,17 +126,10 @@ class SplashScreen extends StatelessWidget {
       children: [
         AmbientBackdrop(),
         Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              BrandLogo(size: 64),
-              SizedBox(height: 24),
-              SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2.2),
-              ),
-            ],
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2.2),
           ),
         ),
       ],

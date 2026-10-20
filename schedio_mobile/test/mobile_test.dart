@@ -171,6 +171,12 @@ void main() {
         ),
       ),
     );
+    await tester.runAsync(
+      () => precacheImage(
+        const AssetImage(brandMarkAsset),
+        tester.element(find.byType(AuthScreen)),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(find.text('Your day, in focus.'), findsOneWidget);

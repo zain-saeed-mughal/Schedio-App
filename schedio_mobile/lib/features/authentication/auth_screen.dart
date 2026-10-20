@@ -193,33 +193,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
   Widget brandHeader() => Column(
     children: [
-      const BrandLogo(size: 64),
-      const SizedBox(height: 16),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            'Schedio',
-            style: AppText.screenTitle.copyWith(fontSize: 30, letterSpacing: -0.9),
-          ),
-          const SizedBox(width: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: AppColors.amber(0.15),
-              borderRadius: AppRadii.pill,
-              border: Border.all(color: AppColors.amber(0.3)),
-            ),
-            child: Text(
-              'ENTERPRISE',
-              style: AppText.monoTiny.copyWith(
-                color: AppColors.amber300,
-                letterSpacing: 1,
-              ),
-            ),
-          ),
-        ],
+      const BrandLogo(size: 84),
+      const SizedBox(height: 18),
+      const FittedBox(
+        fit: BoxFit.scaleDown,
+        child: SchedioWordmark(fontSize: 30),
       ),
+      const SizedBox(height: 10),
+      const BrandTagline(fontSize: 10.5, spacing: 3.6),
     ],
   );
 

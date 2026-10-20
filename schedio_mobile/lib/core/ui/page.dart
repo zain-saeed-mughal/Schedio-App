@@ -22,7 +22,7 @@ EdgeInsets pageInsets(
   double bottom = 24,
   double horizontal = AppSpace.gutter,
 }) {
-  final view = MediaQuery.viewPaddingOf(context);
+  final view = screenPadding(context);
   final width = MediaQuery.sizeOf(context).width;
   final side = width > AppSpace.maxContent + 2 * horizontal
       ? (width - AppSpace.maxContent) / 2
@@ -37,8 +37,11 @@ EdgeInsets pageInsets(
   );
 }
 
+EdgeInsets screenPadding(BuildContext context) =>
+    MediaQueryData.fromView(View.of(context)).viewPadding;
+
 double topChrome(BuildContext context) =>
-    MediaQuery.viewPaddingOf(context).top + AppSpace.topBar;
+    screenPadding(context).top + AppSpace.topBar;
 
 class GlassBar extends StatelessWidget {
   final Widget child;
