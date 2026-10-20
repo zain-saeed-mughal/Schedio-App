@@ -41,11 +41,14 @@ Tokens expire after 30 days. Every protected module request rechecks approval, a
 | POST | notifications/mark-all-read | Owner scoped |
 | POST | notifications/preferences | channel_in_app, channel_email, categories with in_app/email booleans |
 | GET | admin/registration-requests | Admin scoped, status defaults pending |
+| GET | admin/registration-requests/{id}/options | Authorized roles and active departments belonging to the applicant company |
 | PATCH | admin/registration-requests/{id}/approve or reject | Existing fields, with additional anti-escalation checks |
 
 Resource lists support `page`, `search`, and applicable `status`. General resource lists allow `per_page` 1–100; meetings/notes/inbox use 25. Resource responses use `data`; paginated API resources include `links` and `meta`. Inbox/admin collections use Laravel paginator's top-level pagination fields. Flutter's repository decodes both shapes. Mutations that reuse web workflows return a success message; clients refetch authoritative records. Meeting saves return the saved resource.
 
 Meeting fields: title, description, start_time/end_time **with UTC offset**, timezone (IANA), type (in_person/virtual/hybrid), meeting_link, location, department_id, room_id, client_id, is_private, participant_ids, reminder_minutes. Optional external-client metadata and recurrence_frequency preserve existing fields. Recurrence does not generate future instances.
+
+New meetings may set `save_as_client=true` with `client_company`, optional `client_name`, `client_email` and `campaign`. Laravel creates and links the scheduled client in the same transaction, using the authenticated company and owner. An existing `client_id` and edit requests cannot use this flag. Conflicts roll back both records.
 
 Generic resource write validation remains in the existing controllers. The API boundary additionally validates referenced resources through tenant-aware queries. `company_id`, organizer and creator are never accepted as authority from the client.
 
@@ -78,4 +81,4 @@ Availability hides conflicting meeting identities and titles. Existing event `bu
 
 The shared `SerializeScheduling` route middleware wraps existing web meeting creation/update, calendar meeting writes, client scheduling, public booking and API meeting writes in a transaction. It locks the company row (or a host row for a companyless developer) before availability revalidation, including when the calendar is empty. API writes also lock participants and rooms.
 
-This closes the audit's API-only locking gap while leaving the web controllers/views intact. Existing web tests and a cross-channel sequential conflict test pass. SQLite tests do not prove actual PostgreSQL row-lock contention; concurrent staging acceptance is still required.
+This closes the audit's API-only locking gap while leaving the web controllers/views intact. Existing web tests and a cross-channel sequential conflict test pass. Separate file-backed SQLite and PostgreSQL tests use two independent local API processes and verify one success and one conflict for simultaneous bookings. SQLite acquires a write reservation before transaction reads because it ignores row-level `FOR UPDATE`. Sustained remote mixed-channel load testing remains outstanding.

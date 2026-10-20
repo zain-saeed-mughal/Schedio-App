@@ -8,7 +8,8 @@ Native Flutter/Dart application for Android and iOS, connected to the existing L
 - `docs/API.md` — implemented API contract.
 - `docs/FEATURE_PARITY.md` — implementation coverage and remaining acceptance work.
 - `docs/RELEASE.md` — staging, testing, signing and release instructions.
-- `docs/PHASE_SQLITE.md` — latest compatibility phase report, evidence and remaining work.
+- `docs/PHASE_MOBILE_FEATURES.md` — latest mobile feature phase and remaining acceptance work.
+- `docs/PHASE_SQLITE.md` — database compatibility phase report.
 - `docs/PHASE_POSTGRES.md` — primary local staging and mobile workflow phase report.
 - `scripts/verify_staging.py` — live HTTP tests of web/API synchronization, roles and tenant isolation on isolated targets.
 - `schedio_mobile/integration_test/staging_test.dart` — native Android login, task creation, web-to-mobile refresh and access checks.

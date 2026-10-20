@@ -6,6 +6,7 @@ import '../../core/models.dart';
 import '../../core/providers.dart';
 import '../../core/widgets.dart';
 import 'editor.dart';
+import 'approval_screen.dart';
 
 void openEditor(
   BuildContext context,
@@ -460,7 +461,17 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                 FilledButton(
                   onPressed: busy
                       ? null
-                      : () => action('$path/approve', close: true),
+                      : () async {
+                          final approved = await Navigator.push<bool>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ApprovalScreen(applicant: r),
+                            ),
+                          );
+                          if (approved == true && context.mounted) {
+                            Navigator.pop(context);
+                          }
+                        },
                   child: const Text('Approve request'),
                 ),
                 TextButton(

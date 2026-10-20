@@ -72,6 +72,8 @@ class _EditorState extends ConsumerState<Editor> {
       'client_id': r?.clientId ?? widget.clientId,
       'assigned_to': r?.assignedTo,
       'is_private': r?.isPrivate ?? false,
+      'is_client_meeting': r?.isClientMeeting ?? false,
+      'save_as_client': false,
       'is_active': r?.isActive ?? true,
       'is_company_wide': r?.isCompanyWide ?? false,
       'is_all_day': r?.isAllDay ?? false,
@@ -81,6 +83,9 @@ class _EditorState extends ConsumerState<Editor> {
     participantIds.addAll(r?.participants.map((p) => p.id) ?? []);
     final initial = {
       'title': r?.title,
+      'client_name': r?.clientName,
+      'client_email': r?.clientEmail,
+      'client_company': r?.clientCompany,
       'description': r?.description,
       'location': r?.location,
       'meeting_link': r?.meetingLink,
@@ -233,6 +238,15 @@ class _EditorState extends ConsumerState<Editor> {
   Future<void> save() async {
     if (!form.currentState!.validate()) return;
     final m = widget.module;
+    if (m == Module.meetings &&
+        values['is_client_meeting'] == true &&
+        values['save_as_client'] == true &&
+        values['client_id'] != null) {
+      setState(
+        () => error = 'Choose either an existing client or save a new client.',
+      );
+      return;
+    }
     if ([Module.meetings, Module.events].contains(m) &&
         (start == null || end == null || !end!.isAfter(start!))) {
       setState(() => error = 'Choose an end time after the start time.');
@@ -243,7 +257,18 @@ class _EditorState extends ConsumerState<Editor> {
       error = null;
     });
     final allowed = switch (m) {
-      Module.meetings => ['title', 'description', 'location', 'meeting_link'],
+      Module.meetings => [
+        'title',
+        'description',
+        'location',
+        'meeting_link',
+        if (values['is_client_meeting'] == true) ...[
+          'client_name',
+          'client_email',
+          'client_company',
+          'campaign',
+        ],
+      ],
       Module.tasks => ['title', 'description'],
       Module.clients => [
         'company_name',
@@ -286,6 +311,7 @@ class _EditorState extends ConsumerState<Editor> {
         'room_id',
         'client_id',
         'is_private',
+        'is_client_meeting',
         'reminder_minutes',
         'recurrence_frequency',
       ],
@@ -304,6 +330,12 @@ class _EditorState extends ConsumerState<Editor> {
       payload[k] = values[k];
     }
     if (m == Module.meetings) {
+      if (widget.record == null &&
+          values['is_client_meeting'] == true &&
+          values['client_id'] == null &&
+          values['save_as_client'] == true) {
+        payload['save_as_client'] = true;
+      }
       payload['participant_ids'] = participantIds.toList();
       payload['timezone'] = zone;
     }
@@ -402,6 +434,25 @@ class _EditorState extends ConsumerState<Editor> {
                     text('meeting_link', 'Meeting link'),
                     lookup('room_id', 'Room', l.rooms),
                     lookup('client_id', 'Client', l.clients),
+                    toggle('is_client_meeting', 'External guest'),
+                    if (values['is_client_meeting'] == true) ...[
+                      text('client_name', 'Guest name'),
+                      text('client_email', 'Guest email'),
+                      text(
+                        'client_company',
+                        'Guest company',
+                        required: values['save_as_client'] == true,
+                      ),
+                      if (widget.record == null) ...[
+                        toggle('save_as_client', 'Save guest as a new client'),
+                        if (values['save_as_client'] == true) ...[
+                          const Text(
+                            'Leave Client as None to create a new client with this meeting.',
+                          ),
+                          text('campaign', 'Campaign'),
+                        ],
+                      ],
+                    ],
                     toggle('is_private', 'Private meeting'),
                     const Text('Participants'),
                     ...l.users.map(

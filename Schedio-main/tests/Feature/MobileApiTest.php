@@ -260,4 +260,53 @@ class MobileApiTest extends TestCase
         $this->assertDatabaseCount('clients', 1);
         $this->assertDatabaseCount('tasks', 1);
     }
+    public function test_inline_client_is_atomic_scoped_and_not_duplicated_on_edit(): void
+    {
+        $user = $this->user();
+        Sanctum::actingAs($user);
+        $payload = [...$this->payload(), 'is_client_meeting' => true, 'save_as_client' => true,
+            'client_company' => 'Guest company', 'client_name' => 'Guest contact', 'client_email' => 'guest@example.test'];
+        $meeting = $this->postJson('/api/v1/meetings', $payload)->assertCreated()->json('data');
+        $this->assertDatabaseHas('clients', ['id' => $meeting['client_id'], 'company_id' => $user->company_id,
+            'created_by' => $user->id, 'assigned_to' => $user->id, 'status' => 'scheduled']);
+        $this->postJson('/api/v1/meetings', [...$payload, 'client_company' => 'Conflicting guest'])->assertUnprocessable();
+        $this->assertDatabaseCount('clients', 1);
+        $this->putJson('/api/v1/meetings/'.$meeting['id'], $payload)->assertUnprocessable();
+        $this->assertDatabaseCount('clients', 1);
+        Sanctum::actingAs($this->user());
+        $this->getJson('/api/v1/clients/'.$meeting['client_id'])->assertNotFound();
+    }
+
+    public function test_inline_client_requires_company_and_rejects_existing_client_selection(): void
+    {
+        Sanctum::actingAs($this->user());
+        $this->postJson('/api/v1/meetings', [...$this->payload(), 'save_as_client' => true])
+            ->assertUnprocessable()->assertJsonValidationErrors('client_company');
+        $this->postJson('/api/v1/meetings', [...$this->payload(), 'save_as_client' => true,
+            'client_company' => 'Guest', 'client_id' => 99])->assertUnprocessable();
+        $this->assertDatabaseCount('clients', 0);
+        $this->assertDatabaseCount('meetings', 0);
+    }
+
+    public function test_approval_options_and_assignments_are_tenant_scoped(): void
+    {
+        $admin = $this->user(['role' => 'super_admin']);
+        $applicant = User::factory()->create(['company_id' => $admin->company_id, 'approval_status' => 'pending']);
+        $department = \App\Models\Department::create(['company_id' => $admin->company_id,
+            'name' => 'Engineering', 'code' => 'ENG', 'is_active' => true]);
+        $other = $this->user();
+        Sanctum::actingAs($admin);
+        $this->getJson('/api/v1/admin/registration-requests/'.$applicant->id.'/options')
+            ->assertOk()->assertJsonPath('roles', ['manager', 'employee', 'client'])
+            ->assertJsonPath('departments.0.id', $department->id);
+        $this->getJson('/api/v1/admin/registration-requests/'.$other->id.'/options')->assertNotFound();
+        $this->patchJson('/api/v1/admin/registration-requests/'.$applicant->id.'/approve',
+            ['role' => 'super_admin'])->assertUnprocessable();
+        $this->patchJson('/api/v1/admin/registration-requests/'.$applicant->id.'/approve',
+            ['role' => 'manager', 'department_id' => $department->id, 'title' => 'Team lead'])->assertOk();
+        $this->assertDatabaseHas('users', ['id' => $applicant->id, 'role' => 'manager',
+            'department_id' => $department->id, 'title' => 'Team lead', 'approval_status' => 'approved']);
+        Sanctum::actingAs($other);
+        $this->getJson('/api/v1/admin/registration-requests/'.$applicant->id.'/options')->assertForbidden();
+    }
 }

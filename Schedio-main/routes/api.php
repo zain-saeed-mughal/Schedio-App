@@ -38,6 +38,7 @@ Route::prefix('v1')->middleware('throttle:120,1')->group(function () {
             Route::patch('notifications/{id}/{action}', [ActivityController::class, 'notification'])->whereIn('action', ['read', 'unread']);
             Route::delete('notifications/{id}', [ActivityController::class, 'notification']);
             Route::get('admin/registration-requests', [ActivityController::class, 'requests']);
+            Route::get('admin/registration-requests/{id}/options', [ActivityController::class, 'approvalOptions'])->whereNumber('id');
             Route::patch('admin/registration-requests/{id}/{action}', [ActivityController::class, 'decide'])
                 ->whereNumber('id')->whereIn('action', ['approve', 'reject']);
             Route::get('{module}', [WorkspaceController::class, 'index'])->whereIn('module', array_keys(WorkspaceController::MODULES));

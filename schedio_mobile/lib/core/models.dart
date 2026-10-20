@@ -86,6 +86,8 @@ class Record {
       notes,
       dealValue;
   final String? agenda, discussion, decisions, actionItems, code, role, email;
+  final String? jobTitle, clientName, clientEmail, clientCompany;
+  final bool isClientMeeting;
   final int? roomId, departmentId, clientId, assignedTo, meetingId, capacity;
   final List<Member> participants;
   final List<String> amenities;
@@ -95,7 +97,8 @@ class Record {
   Record.fromJson(Json j, this.module)
     : id = '${j['id']}',
       title =
-          (j['title'] ??
+          ((module == Module.administration ? j['name'] : null) ??
+                  j['title'] ??
                   j['company_name'] ??
                   j['name'] ??
                   (j['data'] as Json?)?['title'] ??
@@ -139,6 +142,11 @@ class Record {
       code = j['code'] as String?,
       role = j['role'] as String?,
       email = j['email'] as String?,
+      jobTitle = j['title'] as String?,
+      isClientMeeting = (j['metadata'] as Json?)?['is_client_meeting'] == true,
+      clientName = (j['metadata'] as Json?)?['client_name'] as String?,
+      clientEmail = (j['metadata'] as Json?)?['client_email'] as String?,
+      clientCompany = (j['metadata'] as Json?)?['client_company'] as String?,
       roomId = j['room_id'] as int?,
       departmentId = j['department_id'] as int?,
       clientId = j['client_id'] as int?,

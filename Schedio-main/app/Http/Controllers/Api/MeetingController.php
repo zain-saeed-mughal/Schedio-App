@@ -65,6 +65,20 @@ class MeetingController extends Controller
             $values['metadata'] = array_replace($meeting?->metadata ?? [],
                 collect($data)->only(['is_client_meeting', 'client_name', 'client_email', 'client_company'])->all());
             if (! $meeting) {
+                if ($request->boolean('save_as_client')) {
+                    $client = Client::create([
+                        'company_id' => $u->company_id,
+                        'company_name' => $data['client_company'],
+                        'contact_name' => $data['client_name'] ?? $data['client_company'],
+                        'contact_email' => $data['client_email'] ?? null,
+                        'campaign' => $data['campaign'] ?? 'Direct Outreach',
+                        'progress' => "Meeting scheduled for {$start->format('M d, Y h:i A')}.",
+                        'status' => Client::STATUS_SCHEDULED,
+                        'created_by' => $u->id, 'assigned_to' => $u->id,
+                        'last_activity_at' => now(),
+                    ]);
+                    $values['client_id'] = $client->id;
+                }
                 $values['organizer_id'] = $organizer;
                 $values['company_id'] = $u->company_id;
                 $values['status'] = 'scheduled';

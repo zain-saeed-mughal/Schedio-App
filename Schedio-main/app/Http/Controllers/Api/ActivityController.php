@@ -77,6 +77,18 @@ class ActivityController extends Controller
         return response()->json(['message' => 'Registration request updated.']);
     }
 
+    public function approvalOptions(Request $request, int $id)
+    {
+        $user = $this->requestsQuery($request)->findOrFail($id);
+        return response()->json([
+            'roles' => $request->user()->isDeveloper()
+                ? ['super_admin', 'manager', 'employee', 'client'] : ['manager', 'employee', 'client'],
+            'departments' => Department::withoutGlobalScopes()->whereNull('deleted_at')
+                ->where('company_id', $user->company_id)->where('is_active', true)
+                ->orderBy('name')->get(['id', 'name']),
+        ]);
+    }
+
     public function calendar(Request $request, MobileVisibility $visibility)
     {
         $request->validate(['start' => 'required|date', 'end' => 'required|date|after:start']);

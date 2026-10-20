@@ -1,9 +1,11 @@
 # Local verification — 20 October 2026
 
+- Latest mobile feature phase: 104 Laravel tests / 505 assertions, 20 Flutter tests and clean analysis. New native meeting creation with inline CRM client plus registration approval assignment passed on Android API 36. See `PHASE_MOBILE_FEATURES.md`.
+
 - Separate file-backed SQLite compatibility phase passed: 64 live HTTP checks, queued notification/calendar workflows, concurrent booking protection and the native Android workflow. See `PHASE_SQLITE.md` for the discovered locking issue, fix, queue retry qualification and runtime differences.
 
-- Laravel regression suite: **101 tests, 484 assertions, passing**, using an isolated in-memory SQLite database.
-- Flutter tests: **18 passing**, including calendar mode switching at standard and fractional screen densities.
+- Laravel regression suite: **104 tests, 505 assertions, passing**, using an isolated in-memory SQLite database.
+- Flutter tests: **20 passing**, including calendar mode switching at standard and fractional screen densities.
 - Flutter static analysis: **No issues found**.
 - Android debug APK: **built successfully**, including the optional local notification plugin.
 - Current normal emulator artifact targets x86_64 and the local API. Its dark startup and sign-in screens are recorded in `android-splash.png` and `android-emulator.png`.
