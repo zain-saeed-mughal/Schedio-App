@@ -6,10 +6,12 @@ import 'package:schedio_mobile/core/api.dart';
 import 'package:schedio_mobile/core/models.dart';
 import 'package:schedio_mobile/core/providers.dart';
 import 'package:schedio_mobile/features/workspace/approval_screen.dart';
+import 'package:schedio_mobile/theme/app_theme.dart';
 
 import 'mobile_test.dart' show FakeAdapter;
 
 void main() {
+  setUpAll(() => AppMotion.ambient = false);
   test('applicant name stays distinct from job title and guest metadata survives decoding', () {
     final applicant = Record.fromJson({
       'id': 1,
@@ -62,10 +64,10 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('super admin'), findsNothing);
+      expect(find.text('Super Admin'), findsNothing);
       await tester.tap(find.byType(DropdownButtonFormField<String>));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('manager').last);
+      await tester.tap(find.text('Manager').last);
       await tester.pumpAndSettle();
       await tester.tap(find.byType(DropdownButtonFormField<int>));
       await tester.pumpAndSettle();

@@ -65,10 +65,9 @@ enum Module {
   const Module(this.label, this.path);
 }
 
-/// Decodes transport data at the repository boundary; screens use typed fields.
 class Record {
   final String id, title, status, description;
-  final DateTime? start, end, due;
+  final DateTime? start, end, due, created;
   final bool canManage,
       canRsvp,
       isPrivate,
@@ -114,6 +113,7 @@ class Record {
       start = _date(j['start_time']),
       end = _date(j['end_time']),
       due = _date(j['due_date'] ?? j['follow_up_date']),
+      created = _date(j['created_at']),
       canManage = j['can_manage'] == true,
       canRsvp = j['can_rsvp'] == true,
       isPrivate = j['is_private'] == true,
@@ -175,7 +175,7 @@ class Record {
 
 class RecordPage {
   final List<Record> records;
-  final int page, lastPage;
+  final int page, lastPage, total;
   RecordPage.fromJson(Json j, Module module)
     : records = (j['data'] as List)
           .map((e) => Record.fromJson(e as Json, module))
@@ -184,7 +184,12 @@ class RecordPage {
           ((j['meta'] as Json?)?['current_page'] ?? j['current_page'] ?? 1)
               as int,
       lastPage =
-          ((j['meta'] as Json?)?['last_page'] ?? j['last_page'] ?? 1) as int;
+          ((j['meta'] as Json?)?['last_page'] ?? j['last_page'] ?? 1) as int,
+      total =
+          ((j['meta'] as Json?)?['total'] ??
+                  j['total'] ??
+                  (j['data'] as List).length)
+              as int;
 }
 
 class Dashboard {

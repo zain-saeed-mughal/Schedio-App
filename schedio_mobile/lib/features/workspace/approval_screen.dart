@@ -25,6 +25,7 @@ class _ApprovalScreenState extends ConsumerState<ApprovalScreen> {
   int? department;
   bool busy = false;
   String? error;
+
   @override
   void dispose() {
     title.dispose();
@@ -58,73 +59,111 @@ class _ApprovalScreenState extends ConsumerState<ApprovalScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Review approval')),
-    body: AsyncBody(
-      value: ref.watch(approvalOptionsProvider(widget.applicant.id)),
-      retry: () => ref.invalidate(approvalOptionsProvider(widget.applicant.id)),
-      builder: (options) => ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Text(
-            widget.applicant.title,
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          Text(widget.applicant.email ?? ''),
-          const SizedBox(height: 24),
-          DropdownButtonFormField<String>(
-            initialValue: null,
-            decoration: const InputDecoration(labelText: 'Role'),
-            items: [
-              DropdownMenuItem<String>(
-                value: null,
-                child: Text(
-                  'Keep ${label(widget.applicant.role ?? 'employee')}',
-                ),
-              ),
-              for (final value in (options['roles'] as List).cast<String>())
-                DropdownMenuItem(value: value, child: Text(label(value))),
-            ],
-            onChanged: busy ? null : (v) => role = v,
-          ),
-          const SizedBox(height: 20),
-          DropdownButtonFormField<int>(
-            decoration: const InputDecoration(labelText: 'Department'),
-            items: [
-              const DropdownMenuItem<int>(
-                value: null,
-                child: Text('Keep current department'),
-              ),
-              for (final item in options['departments'] as List)
-                DropdownMenuItem(
-                  value: item['id'] as int,
-                  child: Text(item['name'] as String),
-                ),
-            ],
-            onChanged: busy ? null : (v) => department = v,
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: title,
-            enabled: !busy,
-            maxLength: 150,
-            decoration: const InputDecoration(
-              labelText: 'Job title',
-              helperText: 'Leave blank to keep the current title.',
-            ),
-          ),
-          if (error != null)
-            Text(
-              error!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          const SizedBox(height: 24),
-          FilledButton(
-            onPressed: busy ? null : approve,
-            child: Text(busy ? 'Approving…' : 'Confirm approval'),
-          ),
-        ],
+  Widget build(BuildContext context) {
+    final a = widget.applicant;
+    final ready = ref.watch(approvalOptionsProvider(a.id)).hasValue;
+    return GlassPage(
+      title: 'Review approval',
+      subtitle: a.email,
+      bottomBar: AppButton(
+        label: busy ? 'Approving' : 'Confirm approval',
+        trailingIcon: busy ? null : Icons.check_rounded,
+        busy: busy,
+        expand: true,
+        haptic: HapticKind.medium,
+        onPressed: ready ? approve : null,
       ),
-    ),
-  );
+      body: AsyncBody(
+        value: ref.watch(approvalOptionsProvider(a.id)),
+        retry: () => ref.invalidate(approvalOptionsProvider(a.id)),
+        builder: (options) => ListView(
+          padding: pageInsets(context, bottom: 110),
+          children: [
+            GlassCard(
+              accentEdge: true,
+              child: Row(
+                children: [
+                  AppAvatar(
+                    name: a.title,
+                    size: 52,
+                    kind: a.role == 'super_admin'
+                        ? AvatarKind.gold
+                        : AvatarKind.staff,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(a.title, style: AppText.pageTitle),
+                        const SizedBox(height: 2),
+                        Text(a.email ?? '', style: AppText.monoMuted),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            GlassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('Access settings', style: AppText.cardTitle),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Adjust the role, department or title before granting access.',
+                    style: AppText.helper,
+                  ),
+                  const SizedBox(height: 18),
+                  AppDropdown<String>(
+                    label: 'Role',
+                    value: null,
+                    items: [
+                      DropdownMenuItem<String>(
+                        value: null,
+                        child: Text('Keep ${titleCase(a.role ?? 'employee')}'),
+                      ),
+                      for (final value in (options['roles'] as List).cast<String>())
+                        DropdownMenuItem(value: value, child: Text(titleCase(value))),
+                    ],
+                    onChanged: busy ? null : (v) => role = v,
+                  ),
+                  AppDropdown<int>(
+                    label: 'Department',
+                    value: null,
+                    items: [
+                      const DropdownMenuItem<int>(
+                        value: null,
+                        child: Text('Keep current department'),
+                      ),
+                      for (final item in options['departments'] as List)
+                        DropdownMenuItem(
+                          value: item['id'] as int,
+                          child: Text(item['name'] as String),
+                        ),
+                    ],
+                    onChanged: busy ? null : (v) => department = v,
+                  ),
+                  AppField(
+                    label: 'Job title',
+                    controller: title,
+                    enabled: !busy,
+                    maxLength: 150,
+                    prefixIcon: Icons.work_outline_rounded,
+                    helper: 'Leave blank to keep the current title.',
+                    padding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+            ),
+            if (error != null) ...[
+              const SizedBox(height: 16),
+              InlineBanner(message: error!),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -2,38 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'core/models.dart';
+import 'app/shell.dart';
 import 'core/providers.dart';
 import 'core/widgets.dart';
 import 'features/authentication/auth_screen.dart';
-import 'features/calendar/calendar_screen.dart';
-import 'features/dashboard/home_screen.dart';
-import 'features/settings/more_screen.dart';
-import 'features/settings/settings_screen.dart';
-import 'features/workspace/records_screen.dart';
-import 'theme/app_theme.dart';
+
+export 'app/shell.dart' show WorkspaceShell;
 
 final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
     routes: [
-      GoRoute(path: '/', redirect: (_, _) => '/home'),
-      ShellRoute(
-        builder: (context, state, child) =>
-            WorkspaceShell(path: state.uri.path, child: child),
-        routes: [
-          GoRoute(path: '/home', builder: (_, _) => const HomeScreen()),
-          GoRoute(path: '/calendar', builder: (_, _) => const CalendarScreen()),
-          GoRoute(
-            path: '/meetings',
-            builder: (_, _) => const RecordsScreen(module: Module.meetings),
-          ),
-          GoRoute(
-            path: '/tasks',
-            builder: (_, _) => const RecordsScreen(module: Module.tasks),
-          ),
-          GoRoute(path: '/more', builder: (_, _) => const MoreScreen()),
-        ],
-      ),
+      GoRoute(path: '/', builder: (_, _) => const WorkspaceShell()),
     ],
   );
   ref.onDispose(router.dispose);
@@ -48,6 +27,8 @@ class SchedioApp extends ConsumerStatefulWidget {
 
 class _SchedioAppState extends ConsumerState<SchedioApp>
     with WidgetsBindingObserver {
+  final theme = schedioTheme();
+
   @override
   void initState() {
     super.initState();
@@ -72,24 +53,26 @@ class _SchedioAppState extends ConsumerState<SchedioApp>
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
-    final theme = schedioTheme(Brightness.light),
-        dark = schedioTheme(Brightness.dark);
-    final mode = ref.watch(themeProvider);
     if (auth.value == null || auth.hasError) {
       return MaterialApp(
         title: 'Schedio',
         debugShowCheckedModeBanner: false,
         theme: theme,
-        darkTheme: dark,
-        themeMode: mode,
+        themeMode: ThemeMode.dark,
         home: auth.isLoading
-            ? const Scaffold(body: Center(child: CircularProgressIndicator()))
+            ? const SplashScreen()
             : auth.hasError
             ? Scaffold(
-                body: AsyncBody<Account?>(
-                  value: auth,
-                  retry: () => ref.invalidate(authProvider),
-                  builder: (_) => const AuthScreen(),
+                backgroundColor: AppColors.bgBase,
+                body: Stack(
+                  children: [
+                    const AmbientBackdrop(),
+                    AsyncBody<Object?>(
+                      value: auth,
+                      retry: () => ref.invalidate(authProvider),
+                      builder: (_) => const AuthScreen(),
+                    ),
+                  ],
                 ),
               )
             : const AuthScreen(),
@@ -100,46 +83,36 @@ class _SchedioAppState extends ConsumerState<SchedioApp>
       title: 'Schedio',
       debugShowCheckedModeBanner: false,
       theme: theme,
-      darkTheme: dark,
-      themeMode: mode,
+      themeMode: ThemeMode.dark,
       routerConfig: ref.watch(routerProvider),
     );
   }
 }
 
-class WorkspaceShell extends StatelessWidget {
-  final String path;
-  final Widget child;
-  const WorkspaceShell({super.key, required this.path, required this.child});
+class SplashScreen extends StatelessWidget {
+  const SplashScreen({super.key});
+
   @override
-  Widget build(BuildContext context) {
-    const paths = ['/home', '/calendar', '/meetings', '/tasks', '/more'];
-    return Scaffold(
-      body: SafeArea(child: child),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: paths.indexOf(path).clamp(0, 4),
-        onDestinationSelected: (i) => context.go(paths[i]),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
+  Widget build(BuildContext context) => const Scaffold(
+    backgroundColor: AppColors.bgBase,
+    body: Stack(
+      children: [
+        AmbientBackdrop(),
+        Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              BrandLogo(size: 64),
+              SizedBox(height: 24),
+              SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.2),
+              ),
+            ],
           ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            label: 'Calendar',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.groups_outlined),
-            label: 'Meetings',
-          ),
-          NavigationDestination(icon: Icon(Icons.task_alt), label: 'Tasks'),
-          NavigationDestination(
-            icon: Icon(Icons.grid_view_rounded),
-            label: 'More',
-          ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
 }

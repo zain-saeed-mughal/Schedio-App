@@ -4,17 +4,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:schedio_mobile/app.dart';
+import 'package:schedio_mobile/app/nav_bar.dart';
 import 'package:schedio_mobile/core/api.dart';
 import 'package:schedio_mobile/core/providers.dart';
 import 'package:schedio_mobile/core/widgets.dart';
 import 'package:schedio_mobile/features/workspace/editor.dart';
 import 'package:schedio_mobile/main.dart' as app;
 
-import 'staging_test.dart' show waitFor;
+import 'staging_test.dart' show field, signIn, waitFor;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   WidgetController.hitTestWarningShouldBeFatal = true;
+  AppMotion.ambient = false;
   testWidgets('Staging: client, meeting, calendar, inbox and preferences', (
     tester,
   ) async {
@@ -34,7 +36,7 @@ void main() {
       find.byType(TextFormField).at(1),
       const String.fromEnvironment('ADMIN_A_PASSWORD'),
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await tester.tap(signIn);
     await waitFor(tester, find.byType(WorkspaceShell));
     await tester.pumpAndSettle();
     final container = ProviderScope.containerOf(
@@ -82,8 +84,8 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    Future<void> save() async {
-      await tap(find.widgetWithText(FilledButton, 'Save'));
+    Future<void> save([String label = 'Save']) async {
+      await tap(find.text(label));
       final deadline = DateTime.now().add(const Duration(seconds: 60));
       while (find.byType(Editor).evaluate().isNotEmpty &&
           DateTime.now().isBefore(deadline)) {
@@ -98,29 +100,28 @@ void main() {
     }
 
     try {
-      await tap(find.widgetWithText(NavigationDestination, 'More'));
-      await tap(find.widgetWithText(ListTile, 'Clients'));
-      await waitFor(tester, find.byType(FloatingActionButton));
-      await tap(find.byType(FloatingActionButton));
-      await waitFor(tester, find.widgetWithText(TextFormField, 'Company name'));
+      await tap(find.text('Pipeline'));
+      await tap(find.text('Add New Deal'));
+      await waitFor(tester, field('Company name'));
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Company name'),
+        field('Company name'),
         marker,
       );
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Contact name'),
+        field('Contact name'),
         'Android contact',
       );
       await save();
+      await tap(find.text('Spreadsheet'));
       await waitFor(tester, find.widgetWithText(RecordTile, marker));
       final clients = await api.request('clients', query: {'search': marker});
       clientId = (clients['data'] as List).single['id'].toString();
       await tap(find.widgetWithText(RecordTile, marker));
       await waitFor(tester, find.text('Android contact'));
-      await tap(find.widgetWithText(FilledButton, 'Edit'));
-      await waitFor(tester, find.widgetWithText(TextFormField, 'Contact name'));
+      await tap(find.text('Edit'));
+      await waitFor(tester, field('Contact name'));
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Contact name'),
+        field('Contact name'),
         'Updated Android contact',
       );
       await save();
@@ -130,9 +131,7 @@ void main() {
         'Updated Android contact',
       );
       await back();
-      await back();
 
-      // Real API fixtures let the calendar and editor exercise server data.
       final now = tz.TZDateTime.now(
         locationFor(container.read(authProvider).value!.timezone),
       );
@@ -160,38 +159,37 @@ void main() {
       final created = await api.request('meetings', query: {'search': marker});
       meetingId = (created['data'] as List).single['id'].toString();
       container.read(refreshProvider.notifier).refresh();
-      await tap(find.widgetWithText(NavigationDestination, 'Meetings'));
+      await tap(find.text('Meetings'));
       await waitFor(tester, find.widgetWithText(RecordTile, marker));
       await tap(find.widgetWithText(RecordTile, marker));
       await waitFor(tester, find.text(marker));
-      await tap(find.widgetWithText(FilledButton, 'Edit'));
-      await waitFor(tester, find.widgetWithText(TextFormField, 'Title'));
+      await tap(find.text('Edit'));
+      await waitFor(tester, field('Title'));
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Title'),
+        field('Title'),
         '$marker edited',
       );
-      await save();
+      await save('Save & Set Reminder');
       await waitFor(tester, find.text('$marker edited'));
       expect(
         (await api.request('meetings/$meetingId'))['data']['title'],
         '$marker edited',
       );
-      await tap(find.widgetWithText(ListTile, 'Meeting notes'));
-      await waitFor(tester, find.byType(FloatingActionButton));
-      await tap(find.byType(FloatingActionButton));
-      await waitFor(tester, find.widgetWithText(TextFormField, 'Agenda'));
+      await tap(find.widgetWithText(DetailRow, 'Meeting notes'));
+      await tap(find.text('New Note'));
+      await waitFor(tester, field('Agenda'));
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Agenda'),
+        field('Agenda'),
         marker,
       );
       await save();
       await waitFor(tester, find.widgetWithText(RecordTile, 'Meeting note'));
       await tap(find.widgetWithText(RecordTile, 'Meeting note'));
       await waitFor(tester, find.text(marker));
-      await tap(find.widgetWithText(FilledButton, 'Edit'));
-      await waitFor(tester, find.widgetWithText(TextFormField, 'Agenda'));
+      await tap(find.text('Edit'));
+      await waitFor(tester, field('Agenda'));
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Agenda'),
+        field('Agenda'),
         '$marker revised agenda',
       );
       await save();
@@ -199,10 +197,10 @@ void main() {
       await back();
       await back();
       await back();
-      await tap(find.widgetWithText(NavigationDestination, 'Calendar'));
+      await tap(find.text('Calendar'));
       for (final mode in ['Month', 'Week', 'Day', 'Agenda']) {
         await tap(find.text(mode));
-        await waitFor(tester, find.widgetWithText(ListTile, '$marker edited'));
+        await waitFor(tester, find.text('$marker edited'));
       }
       await employee.request(
         'meetings/$meetingId/rsvp',
@@ -224,36 +222,41 @@ void main() {
         }
       }
       expect(notificationId, isNotNull, reason: 'Queued RSVP inbox delivery');
-      await tap(find.widgetWithText(NavigationDestination, 'More'));
-      await tap(find.widgetWithText(ListTile, 'Notifications'));
+      await tap(find.byTooltip('Notifications'));
       final notification = find.byWidgetPredicate(
         (w) => w is RecordTile && w.record.id == notificationId,
       );
       await waitFor(tester, notification);
       await tap(notification);
-      await tap(find.widgetWithText(FilledButton, 'Mark read'));
-      await waitFor(tester, notification);
-      final inbox = await api.request('notifications');
-      expect(
-        (inbox['data'] as List).singleWhere(
+      await waitFor(tester, find.text('Mark unread'));
+      final readDeadline = DateTime.now().add(const Duration(seconds: 30));
+      Map<String, dynamic>? inboxItem;
+      while (DateTime.now().isBefore(readDeadline)) {
+        final inbox = await api.request('notifications');
+        inboxItem = (inbox['data'] as List).cast<Map<String, dynamic>>().singleWhere(
           (n) => n['id'] == notificationId,
-        )['read_at'],
-        isNotNull,
-      );
+        );
+        if (inboxItem['read_at'] != null) break;
+        await tester.pump(const Duration(milliseconds: 500));
+      }
+      expect(inboxItem?['read_at'], isNotNull);
       await back();
-      await tap(find.widgetWithText(ListTile, 'Settings'));
+      await back();
+      await tap(find.byType(CenterFab));
+      await tap(find.text('Settings'));
       final emailSwitch = find.widgetWithText(
-        SwitchListTile,
+        SwitchRow,
         'Email notifications',
       );
       await tap(emailSwitch);
-      await tap(find.widgetWithText(FilledButton, 'Save preferences'));
+      await tap(find.text('Save preferences'));
       await waitFor(tester, find.text('Notification preferences saved.'));
       await back();
-      await tap(find.widgetWithText(ListTile, 'Settings'));
-      expect(tester.widget<SwitchListTile>(emailSwitch).value, !previousEmail);
+      await tap(find.byType(CenterFab));
+      await tap(find.text('Settings'));
+      expect(tester.widget<SwitchRow>(emailSwitch).value, !previousEmail);
       await tap(emailSwitch);
-      await tap(find.widgetWithText(FilledButton, 'Save preferences'));
+      await tap(find.text('Save preferences'));
       await waitFor(tester, find.text('Notification preferences saved.'));
     } finally {
       if (meetingId != null) {

@@ -76,6 +76,18 @@ class RefreshController extends Notifier<int> {
   void refresh() => state++;
 }
 
+enum ShellTab { home, calendar, meetings, pipeline }
+
+final shellTabProvider = NotifierProvider<ShellTabController, ShellTab>(
+  ShellTabController.new,
+);
+
+class ShellTabController extends Notifier<ShellTab> {
+  @override
+  ShellTab build() => ShellTab.home;
+  void go(ShellTab tab) => state = tab;
+}
+
 final dashboardProvider = FutureProvider((ref) async {
   ref.watch(refreshProvider);
   final account = ref.watch(authProvider).value;
@@ -83,7 +95,6 @@ final dashboardProvider = FutureProvider((ref) async {
   final alerts = ref.read(deviceAlertsProvider);
   final dashboard = await repository.dashboard();
   if (account != null) {
-    // Device permission/plugin failures must not hide the actual workspace.
     try {
       await alerts.sync(repository.api, account);
     } catch (_) {}

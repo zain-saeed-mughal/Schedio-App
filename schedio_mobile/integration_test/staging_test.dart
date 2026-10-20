@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:schedio_mobile/app.dart';
+import 'package:schedio_mobile/app/nav_bar.dart';
 import 'package:schedio_mobile/core/api.dart';
 import 'package:schedio_mobile/core/providers.dart';
 import 'package:schedio_mobile/core/widgets.dart';
@@ -19,8 +20,26 @@ Future<void> waitFor(WidgetTester tester, Finder finder) async {
   expect(finder, findsOneWidget);
 }
 
+final signIn = find.text('Sign In to Workspace');
+
+Finder field(String label) => find.descendant(
+  of: find.byWidgetPredicate((w) => w is AppField && w.label == label),
+  matching: find.byType(TextFormField),
+);
+
+Finder pickerTile(String label) =>
+    find.byWidgetPredicate((w) => w is PickerTile && w.label == label);
+
+Future<void> openQuickAction(WidgetTester tester, String label) async {
+  await tester.tap(find.byType(CenterFab));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(label));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  AppMotion.ambient = false;
   const identities = [
     (
       email: String.fromEnvironment('ADMIN_A_EMAIL'),
@@ -65,7 +84,7 @@ void main() {
           find.byType(TextFormField).at(1),
           identity.password,
         );
-        await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+        await tester.tap(signIn);
         await waitFor(tester, find.byType(WorkspaceShell));
         await tester.pumpAndSettle(const Duration(milliseconds: 300));
         expect(find.byType(WorkspaceShell), findsOneWidget);
@@ -74,15 +93,11 @@ void main() {
         final api = container.read(apiProvider);
         if (identity.role == 'super_admin') {
           await api.request('admin/registration-requests');
-          await tester.tap(find.widgetWithText(NavigationDestination, 'Tasks'));
+          await openQuickAction(tester, 'My Tasks');
+          await tester.tap(find.text('New Task'));
           await tester.pumpAndSettle();
-          await tester.tap(find.byType(FloatingActionButton));
-          await tester.pumpAndSettle();
-          await tester.enterText(
-            find.widgetWithText(TextFormField, 'Title'),
-            title,
-          );
-          final save = find.widgetWithText(FilledButton, 'Save');
+          await tester.enterText(field('Title'), title);
+          final save = find.text('Save');
           await tester.ensureVisible(save);
           await tester.tap(save);
           await waitFor(tester, find.widgetWithText(RecordTile, title));
@@ -90,7 +105,6 @@ void main() {
           expect(find.text(title), findsOneWidget);
           final result = await api.request('tasks', query: {'search': title});
           taskId = (result['data'] as List).single['id'] as int;
-          // Use the actual browser session/CSRF routes to change this same task.
           final browser = Dio(
             BaseOptions(
               baseUrl: Api.baseUrl.replaceFirst(RegExp(r'/api/v1/?$'), ''),
@@ -145,10 +159,12 @@ void main() {
           await browser.post<dynamic>('/logout', data: {'_token': sessionCsrf});
           browser.close();
           await tester.drag(
-            find.descendant(
-              of: find.byType(RefreshIndicator),
-              matching: find.byType(ListView),
-            ),
+            find
+                .descendant(
+                  of: find.byType(RefreshIndicator),
+                  matching: find.byType(ListView),
+                )
+                .first,
             const Offset(0, 500),
           );
           await tester.pumpAndSettle(const Duration(milliseconds: 300));
@@ -165,6 +181,8 @@ void main() {
             method: 'PATCH',
             data: {'status': 'cancelled'},
           );
+          await tester.tap(find.byTooltip('Back'));
+          await tester.pumpAndSettle();
         } else {
           await expectLater(
             api.request('admin/registration-requests'),
@@ -177,17 +195,17 @@ void main() {
           final result = await api.request('tasks', query: {'search': title});
           expect(result['data'], isEmpty);
         }
-        await tester.tap(find.widgetWithText(NavigationDestination, 'More'));
+        await tester.tap(find.byType(CenterFab));
         await tester.pumpAndSettle();
         await tester.scrollUntilVisible(
-          find.text('Sign out'),
+          find.text('Sign Out'),
           300,
-          scrollable: find.byType(Scrollable).first,
+          scrollable: find.byType(Scrollable).last,
         );
-        await tester.tap(find.text('Sign out'));
-        await waitFor(tester, find.widgetWithText(FilledButton, 'Sign in'));
+        await tester.tap(find.text('Sign Out'));
+        await waitFor(tester, signIn);
         await tester.pumpAndSettle(const Duration(milliseconds: 300));
-        expect(find.widgetWithText(FilledButton, 'Sign in'), findsOneWidget);
+        expect(signIn, findsOneWidget);
       }
     },
   );

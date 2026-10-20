@@ -20,8 +20,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   int? companyId, departmentId;
   List<Member> companies = [];
   List<({int id, int companyId, String name})> departments = [];
+
   TextEditingController field(String key) =>
       fields.putIfAbsent(key, TextEditingController.new);
+
   @override
   void dispose() {
     for (final c in fields.values) {
@@ -105,255 +107,353 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
   }
 
+  void toggleMode() {
+    setState(() {
+      register = !register;
+      error = null;
+    });
+    if (register) options();
+  }
+
   Widget input(
     String key,
     String title, {
     bool required = false,
     bool password = false,
-  }) => Padding(
-    padding: const EdgeInsets.only(bottom: 16),
-    child: TextFormField(
-      controller: field(key),
-      obscureText: password && obscure,
-      keyboardType: key == 'email'
-          ? TextInputType.emailAddress
-          : TextInputType.text,
-      autofillHints: key == 'email'
-          ? [AutofillHints.email]
-          : password
-          ? [AutofillHints.password]
-          : null,
-      decoration: InputDecoration(
-        labelText: title,
-        suffixIcon: password
-            ? IconButton(
-                onPressed: () => setState(() => obscure = !obscure),
-                icon: Icon(
-                  obscure
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
-                ),
-              )
-            : null,
-      ),
-      validator: (v) {
-        if (required && (v == null || v.trim().isEmpty)) {
-          return '$title is required';
-        }
-        if (key == 'email' &&
-            !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v ?? '')) {
-          return 'Enter a valid email';
-        }
-        if (key == 'password_confirmation' && v != field('password').text) {
-          return 'Passwords do not match';
-        }
-        return null;
-      },
+    bool highlighted = false,
+    IconData? icon,
+    int lines = 1,
+    String? hint,
+  }) => AppField(
+    label: title,
+    controller: field(key),
+    required: required,
+    highlighted: highlighted,
+    obscure: password && obscure,
+    maxLines: lines,
+    hint: hint,
+    prefixIcon: icon,
+    keyboardType: key == 'email'
+        ? TextInputType.emailAddress
+        : key == 'phone'
+        ? TextInputType.phone
+        : TextInputType.text,
+    autofillHints: key == 'email'
+        ? const [AutofillHints.email]
+        : password
+        ? const [AutofillHints.password]
+        : null,
+    suffix: password
+        ? IconButton(
+            tooltip: obscure ? 'Show password' : 'Hide password',
+            onPressed: () => setState(() => obscure = !obscure),
+            icon: Icon(
+              obscure
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
+              size: 20,
+            ),
+          )
+        : null,
+    validator: (v) {
+      if (required && (v == null || v.trim().isEmpty)) {
+        return '$title is required';
+      }
+      if (key == 'email' &&
+          !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v ?? '')) {
+        return 'Enter a valid email';
+      }
+      if (key == 'password_confirmation' && v != field('password').text) {
+        return 'Passwords do not match';
+      }
+      return null;
+    },
+  );
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AppColors.bgBase,
+    body: Stack(
+      children: [
+        const AmbientBackdrop(dim: true),
+        SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 28, 20, 32),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: accountStatus != null ? statusGate() : authForm(),
+              ),
+            ),
+          ),
+        ),
+      ],
     ),
   );
-  @override
-  Widget build(BuildContext context) {
-    if (accountStatus != null) {
-      return Scaffold(
-        body: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: Padding(
-                padding: const EdgeInsets.all(28),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      accountStatus == 'pending'
-                          ? Icons.hourglass_top
-                          : Icons.lock_outline,
-                      size: 64,
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Account ${label(accountStatus!)}',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      error ?? 'Your registration is with the administrator for review.',
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: () => setState(() {
-                        accountStatus = null;
-                        register = false;
-                        error = null;
-                      }),
-                      child: const Text('Back to sign in'),
-                    ),
-                  ],
-                ),
+
+  Widget brandHeader() => Column(
+    children: [
+      const BrandLogo(size: 64),
+      const SizedBox(height: 16),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            'Schedio',
+            style: AppText.screenTitle.copyWith(fontSize: 30, letterSpacing: -0.9),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.amber(0.15),
+              borderRadius: AppRadii.pill,
+              border: Border.all(color: AppColors.amber(0.3)),
+            ),
+            child: Text(
+              'ENTERPRISE',
+              style: AppText.monoTiny.copyWith(
+                color: AppColors.amber300,
+                letterSpacing: 1,
               ),
             ),
           ),
-        ),
-      );
-    }
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(28),
-              child: Form(
-                key: form,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.asset(
-                            'assets/images/schedio-logo.jpg',
-                            width: 46,
-                            height: 46,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Schedio',
-                          style: Theme.of(context).textTheme.headlineMedium,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 44),
-                    Text(
-                      register ? 'Join your workspace' : 'Your day, in focus.',
-                      style: Theme.of(context).textTheme.headlineLarge,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      register
-                          ? 'Create an account for administrator approval.'
-                          : 'Meetings, people and progress.\nTogether in one workspace.',
-                    ),
-                    const SizedBox(height: 32),
-                    if (register) ...[
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Register a new company'),
-                        value: company,
-                        onChanged: busy
-                            ? null
-                            : (v) => setState(() => company = v),
-                      ),
-                      input('name', 'Full name', required: true),
-                      if (company)
-                        input('company_name', 'Company name', required: true)
-                      else ...[
-                        DropdownButtonFormField<int>(
-                          initialValue: companyId,
-                          decoration: const InputDecoration(
-                            labelText: 'Company',
-                          ),
-                          items: companies
-                              .map(
-                                (m) => DropdownMenuItem(
-                                  value: m.id,
-                                  child: Text(m.name),
-                                ),
-                              )
-                              .toList(),
-                          validator: (v) =>
-                              v == null ? 'Choose a company' : null,
-                          onChanged: (v) => setState(() {
-                            companyId = v;
-                            departmentId = null;
-                          }),
-                        ),
-                        const SizedBox(height: 16),
-                        DropdownButtonFormField<int>(
-                          key: ValueKey(companyId),
-                          initialValue: departmentId,
-                          decoration: const InputDecoration(
-                            labelText: 'Department (optional)',
-                          ),
-                          items: departments
-                              .where((d) => d.companyId == companyId)
-                              .map(
-                                (d) => DropdownMenuItem(
-                                  value: d.id,
-                                  child: Text(d.name),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (v) => setState(() => departmentId = v),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                      input('title', 'Job title'),
-                      input('phone', 'Phone'),
-                    ],
-                    input('email', 'Email', required: true),
-                    input(
-                      'password',
-                      'Password',
-                      required: true,
-                      password: true,
-                    ),
-                    if (register) ...[
-                      input(
-                        'password_confirmation',
-                        'Confirm password',
-                        required: true,
-                        password: true,
-                      ),
-                      input('registration_notes', 'Registration notes'),
-                    ],
-                    if (error != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Text(
-                          error!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                        ),
-                      ),
-                    FilledButton(
-                      onPressed: busy ? null : submit,
-                      child: Text(
-                        busy
-                            ? 'Please wait…'
-                            : register
-                            ? 'Submit registration'
-                            : 'Sign in',
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: busy
-                          ? null
-                          : () {
-                              setState(() {
-                                register = !register;
-                                error = null;
-                              });
-                              if (register) options();
-                            },
-                      child: Text(
-                        register
-                            ? 'Already registered? Sign in'
-                            : 'Request an account',
-                      ),
-                    ),
-                  ],
+        ],
+      ),
+    ],
+  );
+
+  Widget authForm() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      brandHeader(),
+      const SizedBox(height: 32),
+      GlassCard(
+        tone: GlassTone.panel,
+        blur: true,
+        flare: true,
+        padding: const EdgeInsets.fromLTRB(22, 26, 22, 22),
+        child: AutofillGroup(
+          child: Form(
+            key: form,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  register ? 'Join your workspace' : 'Your day, in focus.',
+                  style: AppText.pageTitle.copyWith(fontSize: 24),
                 ),
-              ),
+                const SizedBox(height: 6),
+                Text(
+                  register
+                      ? 'Create an account for administrator approval.'
+                      : 'Meetings, people and progress. Together in one workspace.',
+                  style: AppText.helper.copyWith(fontSize: 13),
+                ),
+                const SizedBox(height: 24),
+                if (register) ...registerFields() else ...[
+                  input(
+                    'email',
+                    'Email',
+                    required: true,
+                    icon: Icons.alternate_email_rounded,
+                    hint: 'you@company.com',
+                  ),
+                  input(
+                    'password',
+                    'Password',
+                    required: true,
+                    password: true,
+                    icon: Icons.lock_outline_rounded,
+                    hint: 'Your password',
+                  ),
+                ],
+                if (error != null) ...[
+                  InlineBanner(message: error!),
+                  const SizedBox(height: 16),
+                ],
+                const SizedBox(height: 4),
+                AppButton(
+                  label: busy
+                      ? 'Please wait'
+                      : register
+                      ? 'Submit Registration'
+                      : 'Sign In to Workspace',
+                  trailingIcon: busy ? null : Icons.arrow_forward_rounded,
+                  busy: busy,
+                  expand: true,
+                  size: ButtonSize.lg,
+                  haptic: HapticKind.medium,
+                  onPressed: submit,
+                ),
+              ],
             ),
           ),
         ),
       ),
+      const SizedBox(height: 20),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Flexible(
+            child: Text(
+              register ? 'Already registered?' : 'New to your team workspace?',
+              style: AppText.helper,
+            ),
+          ),
+          TextButton(
+            onPressed: busy ? null : toggleMode,
+            child: Text(register ? 'Sign in' : 'Request Staff Access'),
+          ),
+        ],
+      ),
+    ],
+  );
+
+  List<Widget> registerFields() => [
+    SegmentedTabs<bool>(
+      compact: true,
+      selected: company,
+      onChanged: busy ? (_) {} : (v) => setState(() => company = v),
+      segments: const [
+        Segment(false, 'Join Existing Team', icon: Icons.groups_2_outlined),
+        Segment(true, 'New Company (CEO)', icon: Icons.apartment_rounded),
+      ],
+    ),
+    const SizedBox(height: 14),
+    InlineBanner(
+      kind: company ? BannerKind.warning : BannerKind.info,
+      message: company
+          ? 'Your company request goes to the Platform Developer. Once approved, your workspace and CEO access are activated together.'
+          : 'Your request goes to your company Super Admin for review before you can sign in.',
+    ),
+    const SizedBox(height: 18),
+    if (company)
+      input(
+        'company_name',
+        'Company name',
+        required: true,
+        highlighted: true,
+        icon: Icons.apartment_rounded,
+      )
+    else ...[
+      AppDropdown<int>(
+        label: 'Company',
+        required: true,
+        value: companyId,
+        items: companies
+            .map((m) => DropdownMenuItem(value: m.id, child: Text(m.name)))
+            .toList(),
+        validator: (v) => v == null ? 'Choose a company' : null,
+        onChanged: (v) => setState(() {
+          companyId = v;
+          departmentId = null;
+        }),
+      ),
+      AppDropdown<int>(
+        key: ValueKey(companyId),
+        label: 'Department (optional)',
+        value: departmentId,
+        items: departments
+            .where((d) => d.companyId == companyId)
+            .map((d) => DropdownMenuItem(value: d.id, child: Text(d.name)))
+            .toList(),
+        onChanged: (v) => setState(() => departmentId = v),
+      ),
+    ],
+    input('name', 'Full name', required: true, icon: Icons.person_outline_rounded),
+    input(
+      'email',
+      'Email',
+      required: true,
+      icon: Icons.alternate_email_rounded,
+    ),
+    input('title', 'Job title', icon: Icons.work_outline_rounded),
+    input('phone', 'Phone', icon: Icons.phone_outlined),
+    input(
+      'password',
+      'Password',
+      required: true,
+      password: true,
+      icon: Icons.lock_outline_rounded,
+    ),
+    input(
+      'password_confirmation',
+      'Confirm password',
+      required: true,
+      password: true,
+      icon: Icons.lock_outline_rounded,
+    ),
+    input(
+      'registration_notes',
+      'Note for the reviewer',
+      lines: 3,
+      hint: 'Anything that helps your administrator approve you',
+    ),
+  ];
+
+  Widget statusGate() {
+    final pending = accountStatus == 'pending';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        brandHeader(),
+        const SizedBox(height: 32),
+        GlassCard(
+          tone: GlassTone.panel,
+          blur: true,
+          accentEdge: pending,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              IconTile(
+                icon: pending
+                    ? Icons.hourglass_top_rounded
+                    : Icons.lock_outline_rounded,
+                tint: pending ? Tint.warning : Tint.danger,
+                size: 64,
+                iconSize: 30,
+                radius: AppRadii.innerAll,
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Account ${label(accountStatus!)}',
+                style: AppText.pageTitle,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              StatusPill(
+                text: pending ? 'Pending Review' : titleCase(accountStatus!),
+                tint: pending ? Tint.warning : Tint.danger,
+                size: PillSize.md,
+                dot: true,
+              ),
+              const SizedBox(height: 16),
+              if (!pending && error != null)
+                InlineBanner(title: 'Reason', message: error!)
+              else
+                Text(
+                  error ??
+                      'Your registration is with the administrator for review. You can sign in once it is approved.',
+                  textAlign: TextAlign.center,
+                  style: AppText.body,
+                ),
+              const SizedBox(height: 22),
+              AppButton(
+                label: 'Back to sign in',
+                icon: Icons.arrow_back_rounded,
+                variant: ButtonVariant.glass,
+                expand: true,
+                onPressed: () => setState(() {
+                  accountStatus = null;
+                  register = false;
+                  error = null;
+                }),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

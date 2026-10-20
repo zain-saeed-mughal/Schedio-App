@@ -11,7 +11,6 @@ import 'package:schedio_mobile/core/providers.dart';
 import 'package:schedio_mobile/features/authentication/auth_screen.dart';
 import 'package:schedio_mobile/features/calendar/calendar_screen.dart';
 import 'package:schedio_mobile/features/workspace/editor.dart';
-import 'package:schedio_mobile/theme/app_theme.dart';
 import 'package:schedio_mobile/core/widgets.dart';
 import 'package:timezone/data/latest.dart' as tz;
 
@@ -59,6 +58,7 @@ class FakeAdapter implements HttpClientAdapter {
 
 void main() {
   setUpAll(() async {
+    AppMotion.ambient = false;
     tz.initializeTimeZones();
     final font = FontLoader('Plus Jakarta Sans')
       ..addFont(rootBundle.load('assets/fonts/PlusJakartaSans.ttf'));
@@ -147,12 +147,12 @@ void main() {
       ProviderScope(
         overrides: [apiProvider.overrideWithValue(Api(client: dio))],
         child: MaterialApp(
-          theme: schedioTheme(Brightness.dark),
+          theme: schedioTheme(),
           home: const AuthScreen(),
         ),
       ),
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await tester.tap(find.text('Sign In to Workspace'));
     await tester.pumpAndSettle();
     expect(find.text('Email is required'), findsOneWidget);
     expect(find.text('Password is required'), findsOneWidget);
@@ -166,7 +166,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
-          theme: schedioTheme(Brightness.dark),
+          theme: schedioTheme(),
           home: const AuthScreen(),
         ),
       ),
@@ -197,7 +197,7 @@ void main() {
             authProvider.overrideWith(FixtureAuth.new),
           ],
           child: MaterialApp(
-            theme: schedioTheme(Brightness.dark),
+            theme: schedioTheme(),
             home: const CalendarScreen(),
           ),
         ),
@@ -241,7 +241,7 @@ void main() {
             authProvider.overrideWith(FixtureAuth.new),
           ],
           child: MaterialApp(
-            theme: schedioTheme(Brightness.dark),
+            theme: schedioTheme(),
             home: Editor(module: module, meetingId: '1'),
           ),
         ),
