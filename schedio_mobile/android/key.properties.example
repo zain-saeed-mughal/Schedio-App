@@ -1,0 +1,4 @@
+storePassword=SET_LOCALLY
+keyPassword=SET_LOCALLY
+keyAlias=upload
+storeFile=/absolute/path/to/upload-keystore.jks
