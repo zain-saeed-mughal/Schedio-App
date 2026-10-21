@@ -15,7 +15,7 @@ The app accepts only HTTPS URLs on public hosts in staging and production builds
 
 ## 2. Code that must be deployed
 
-All of these already exist in `Schedio-main/` on the `main` branch (commit `8bd453a`). Deploy them as they are.
+These exist in the Laravel **development copy** inside the mobile repository (`Schedio-main/`, commit `8bd453a`), which the mobile team tested against. They are a reference implementation, not necessarily what the official backend contains. Merge or reimplement the equivalent in the official repository, then confirm with `schedio_mobile/tool/api_contract_check.dart` (see BACKEND_INTEGRATION_HANDOFF.md section 14).
 
 | Area | Files |
 |---|---|

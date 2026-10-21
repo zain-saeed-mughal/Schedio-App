@@ -8,7 +8,7 @@ Companion documents:
 - `docs/MOBILE_API_REQUIREMENTS.md`: every endpoint, field and status code the app uses today.
 - `docs/BACKEND_DEPLOYMENT_REQUIREMENTS.md`: server, environment and acceptance-check details.
 
-Repository note: the GitHub repository `zain-saeed-mughal/Schedio-App` currently contains both the Laravel code (`Schedio-main/`) and the Flutter app (`schedio_mobile/`). The mobile API described here lives in `Schedio-main/` on `main`. Mobile changes are kept inside `schedio_mobile/` and these docs.
+Repository note: the official Laravel backend is maintained by you in a separate repository. The mobile repository (`zain-saeed-mughal/Schedio-App`) also contains a Laravel **development copy** in `Schedio-main/`, which the mobile team used to build and test the app locally. It is a reference implementation of the contract below, **not** the official backend, and it may differ from what runs on `schedio.live`. Section 14 compares the two. Mobile changes are kept inside `schedio_mobile/` and these docs.
 
 ## 1. API location and version
 
@@ -21,7 +21,7 @@ Requirements: HTTPS with a public certificate, JSON on every response (including
 
 ## 2. Authentication
 
-The app is built for **Laravel Sanctum personal access tokens**, as implemented in `Schedio-main/app/Http/Controllers/Api/AuthController.php`. Please confirm this is the official mechanism.
+The app is built for **Laravel Sanctum personal access tokens** (bearer tokens with a `mobile` ability and a 30 day expiry in the development copy). Please confirm this is the official mechanism, or tell the mobile team what the official backend uses.
 
 | Step | Request | Response the app relies on |
 |---|---|---|
@@ -175,7 +175,35 @@ Run the 9 checks in `BACKEND_DEPLOYMENT_REQUIREMENTS.md` section 6 (JSON 404s, l
 |---|---|---|
 | 1 | Deploy the mobile API at the production host (`/api/v1/*` currently 404) | Backend |
 | 2 | Staging DNS, HTTPS and deployment, plus test accounts | Backend |
-| 3 | Confirm the official base URLs and Sanctum as the authentication method | Backend |
+| 3 | Confirm the official base URLs, the authentication method, and the answers in section 14 | Backend |
 | 4 | Queue worker and scheduler running on staging and production | Backend |
 | 5 | Device token endpoints and FCM sending (needed only if push is in scope for release) | Backend, then mobile |
 | 6 | Optional: send `{}` instead of `[]` for empty object fields (`metadata`, `categories`); the app already tolerates both | Backend |
+
+## 14. Development copy versus official backend
+
+The mobile team cannot see your repository, so the comparison is done from the outside with the contract checker in the mobile repository:
+
+```bash
+cd schedio_mobile
+dart run tool/api_contract_check.dart https://<host>/api/v1/
+```
+
+It probes all 54 endpoints the app uses with side-effect-free `GET` requests and no token. An existing protected route answers 401, a write-only route answers 405, and a missing route answers Laravel's "route could not be found" or an HTML 404. With `SCHEDIO_TOKEN` set to a test account's token, it also checks that the read-only collection endpoints return 200 JSON with the expected top-level fields. It never sends writes.
+
+Results on 2026-10-22:
+
+| Server | Routes present | Authenticated reads | Notes |
+|---|---|---|---|
+| Development copy, `http://127.0.0.1:8090/api/v1/` | 52 of 54 | 13 of 13 OK | Missing only `POST devices` and `DELETE devices/{token}` (push, not built anywhere yet) |
+| Official production, `https://schedio.live/api/v1/` | 0 of 54 | not run | Every route is a 404 (HTML for `GET`, JSON "route could not be found" for `POST`) |
+| Official staging, `https://staging.schedio.live/api/v1/` | not reachable | not run | Hostname does not resolve |
+
+Once official staging is up, please run the checker (or ask the mobile team to), and send the output with any intentional differences. To make the comparison complete, please answer:
+
+1. The official base URLs for staging and production.
+2. Whether authentication is Sanctum bearer tokens, and the token lifetime.
+3. Whether the routes and fields in `MOBILE_API_REQUIREMENTS.md` match the official code. List any renamed fields, extra required fields or different status codes.
+4. Whether `routes/api.php`, `Api\*` controllers, `MobileAccess` and `SerializeScheduling` from the development copy should be merged into the official repository, or reimplemented there.
+5. Whether push notifications (section 9) are in scope for the first release.
+6. Who provides staging test accounts for at least two companies, and how they are shared securely.

@@ -19,6 +19,9 @@ Device: Android phone model `2404ARN45A` (serial `p7a6a6mfqwx8ww9l`). Backend: t
 | `integration_test/device_checks_test.dart` on the phone | PASS | Dashboard and bottom bar, public booking confirmed, offline message with the server cut off, recovery after reconnecting |
 | `integration_test/session_persistence_test.dart` on the phone, Wi-Fi only | PASS | Launch 1 signs in over Wi-Fi; after a force-stop, launch 2 opens the workspace with the saved session |
 | Signed release on the phone | PASS (smoke) | Installed and launched to sign-in; not debuggable. Sign-in BLOCKED: staging has no DNS. |
+| `integration_test/staging_smoke_test.dart` (HTTPS staging, read-only) | BLOCKED | Written and analyzed; refuses HTTP, private hosts and non-staging builds. Needs the staging server and staging test credentials. |
+| API contract check, development copy | PASS (52/54) | `tool/api_contract_check.dart`: 52 of 54 routes present, 13 of 13 authenticated reads return 200 JSON with expected fields; only the 2 push device routes are missing |
+| API contract check, official production | FAIL (0/54) | Every route returns 404 at `https://schedio.live/api/v1/` |
 
 ## Defects found on the device and fixed (this branch)
 
@@ -91,6 +94,16 @@ Device: Android phone model `2404ARN45A` (serial `p7a6a6mfqwx8ww9l`). Backend: t
 | Staging backend | BLOCKED | `staging.schedio.live` does not resolve |
 | Production backend | BLOCKED | `schedio.live/api/v1/*` returns 404 |
 | iOS build and signing | BLOCKED | Requires macOS, Xcode and an Apple Developer account |
+
+## Staging release smoke procedure
+
+Run once the backend team confirms the staging URL and sends staging test credentials privately. No USB tunnel, localhost or LAN address is involved.
+
+1. `cd schedio_mobile && dart run tool/api_contract_check.dart https://staging.schedio.live/api/v1/`. Expect 52 of 54 present (or 54 if push is deployed).
+2. Automated tour on the phone over Wi-Fi or mobile data: `flutter test integration_test/staging_smoke_test.dart -d <device> --dart-define=APP_ENV=staging --dart-define=STAGING_EMAIL=... --dart-define=STAGING_PASSWORD=...` (pass the password from a local file, never commit it).
+3. Signed release: `flutter build apk --release --dart-define=APP_ENV=staging`, confirm the signer SHA-256 `807f482b...e0e181` with `apksigner verify --print-certs`, install, then by hand: sign in, dashboard, each tab, create and cancel a test meeting, open a notification, public booking, sign out, force-stop and relaunch.
+4. Web sync: create a meeting on the staging website and confirm it appears in the app after pull to refresh; create one in the app and confirm it on the website.
+5. Record each step as PASS or FAIL in this file.
 
 ## Application ID and versioning
 
