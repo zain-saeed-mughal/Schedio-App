@@ -566,7 +566,11 @@ class AppRefresh extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => RefreshIndicator(
-    onRefresh: onRefresh,
+    onRefresh: () async {
+      try {
+        await onRefresh();
+      } catch (_) {}
+    },
     color: AppColors.amber400,
     backgroundColor: AppColors.surface,
     edgeOffset: edgeOffset,

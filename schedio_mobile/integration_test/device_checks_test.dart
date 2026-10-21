@@ -5,6 +5,7 @@ import 'package:schedio_mobile/app.dart';
 import 'package:schedio_mobile/app/nav_bar.dart';
 import 'package:schedio_mobile/core/api.dart';
 import 'package:schedio_mobile/core/widgets.dart';
+import 'package:schedio_mobile/features/dashboard/home_screen.dart';
 import 'package:schedio_mobile/main.dart' as app;
 
 import 'staging_test.dart' show signIn, waitFor;
@@ -46,10 +47,14 @@ void main() {
     );
     await tester.tap(signIn);
     await waitFor(tester, find.byType(WorkspaceShell));
-
     await waitFor(tester, find.text('Warm welcome:)'));
-    expect(find.text("TODAY'S SCHEDULE"), findsOneWidget);
-    expect(find.text('Public Booking Link'), findsOneWidget);
+    final homeList = find
+        .descendant(of: find.byType(HomeScreen), matching: find.byType(Scrollable))
+        .first;
+    await tester.scrollUntilVisible(find.text('Public Booking Link'), 250, scrollable: homeList);
+    await tester.scrollUntilVisible(find.text("TODAY'S SCHEDULE"), 250, scrollable: homeList);
+    await tester.drag(homeList, const Offset(0, 3000));
+    await tester.pumpAndSettle();
     debugPrint('CHECK dashboard PASS');
     await tester.pumpAndSettle(const Duration(seconds: 1));
     expect(tester.getCenter(find.byType(CenterFab)).dy, lessThan(tester.view.physicalSize.height / tester.view.devicePixelRatio), reason: 'bottom bar visible after sign in');
@@ -62,6 +67,7 @@ void main() {
     await waitFor(tester, find.text('Verified Host'));
     await tester.ensureVisible(find.byType(DateCard).at(1));
     await tester.tap(find.byType(DateCard).at(1));
+    await tester.pump(const Duration(milliseconds: 200));
     await waitUntil(
       tester,
       () =>
@@ -96,14 +102,14 @@ void main() {
     await tester.pumpAndSettle();
 
     debugPrint('MARKER READY_FOR_OFFLINE');
-    final refresher = find.byType(RefreshIndicator).first;
+    final refresher = find.byType(RefreshIndicator);
     await waitUntil(
       tester,
       () => find.textContaining('Could not reach the Schedio server').evaluate().isNotEmpty,
       timeout: const Duration(seconds: 120),
       each: () async {
         if (refresher.evaluate().isNotEmpty) {
-          await tester.fling(refresher, const Offset(0, 600), 1500);
+          await tester.fling(refresher.first, const Offset(0, 600), 1500);
         }
         await tester.pump(const Duration(seconds: 2));
       },

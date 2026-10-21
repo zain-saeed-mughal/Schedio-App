@@ -49,6 +49,8 @@ Status: FIXED means changed in this pass and covered by an automated test where 
 | P1-9 | Found on the phone: the Meetings tab failed to load when a meeting had `"metadata": []` (Laravel serializes empty objects as arrays). Account preferences had the same risk at sign-in. | FIXED. Tolerant nested-object reads in `models.dart`. Tested in `model_parsing_test.dart` and on the device (workflows_test). |
 | P1-10 | Found on the phone: the keyboard stayed open after signing in, which hid the bottom navigation bar. | FIXED. Sign-in closes the keyboard on submit. |
 | P1-11 | The previous tab stayed laid out after every tab switch, because the shell never rebuilt when the transition ended. | FIXED. |
+| P1-12 | Found on the phone: pull-to-refresh while offline let a network error escape uncaught on every list screen. | FIXED. `AppRefresh` handles the failure; the screen already shows the error panel. Regression test fails without the fix. |
+| P1-13 | Local test API returned HTML fatal errors ("Cannot instantiate interface RecursiveIterator") while Artisan worked. | FIXED in local tooling only: corrupted Windows OPcache shared memory across several `php -S` processes. The start script now disables OPcache for dev servers and checks for JSON. See LOCAL_BACKEND_TROUBLESHOOTING.md. |
 
 ### P2, minor issues and improvements
 

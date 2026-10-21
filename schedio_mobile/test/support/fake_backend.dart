@@ -91,6 +91,7 @@ List<Map<String, dynamic>> clientFixtures(String status) => status == 'discovery
 
 class FakeBackend implements HttpClientAdapter {
   final requests = <RequestOptions>[];
+  bool offline = false;
   final Map<String, dynamic> user;
   FakeBackend({Map<String, dynamic>? user}) : user = user ?? userFixture();
 
@@ -158,6 +159,9 @@ class FakeBackend implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     requests.add(o);
+    if (offline) {
+      throw DioException(requestOptions: o, type: DioExceptionType.connectionError);
+    }
     return ResponseBody.fromString(
       jsonEncode(respond(o)),
       200,

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../core/models.dart';
 import '../core/providers.dart';
+import '../core/push.dart';
 import '../core/widgets.dart';
 import '../features/availability/availability_screen.dart';
 import '../features/booking/booking_screen.dart';
@@ -18,6 +19,7 @@ import '../features/workspace/editor.dart';
 import '../features/workspace/records_screen.dart';
 import '../features/workspace/registration_queue.dart';
 import 'nav_bar.dart';
+import 'push_routing.dart';
 
 final pendingRequestsProvider = FutureProvider.autoDispose<int>((ref) async {
   ref.watch(refreshProvider);
@@ -75,6 +77,28 @@ class _WorkspaceShellState extends ConsumerState<WorkspaceShell>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     startPolling();
+    final push = ref.read(pushServiceProvider)
+      ..onOpen = openFromPush
+      ..onForeground = (message) {
+        ref.invalidate(dashboardProvider);
+        if (mounted && message.title != null) showToast(context, message.title!);
+      };
+    unawaited(push.start().catchError((Object _) {}));
+  }
+
+  void openFromPush(PushMessage message) {
+    if (!mounted) return;
+    ref.read(refreshProvider.notifier).refresh();
+    final id = message.notificationId;
+    if (id != null) {
+      unawaited(
+        ref
+            .read(apiProvider)
+            .request('notifications/$id/read', method: 'PATCH')
+            .then<void>((_) {}, onError: (Object _) {}),
+      );
+    }
+    pushScreen(context, screenForPush(message));
   }
 
   void startPolling() {

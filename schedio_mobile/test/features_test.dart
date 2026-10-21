@@ -166,4 +166,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Sign In to Workspace'), findsOneWidget);
   });
+
+  testWidgets('pull to refresh while offline shows the error without leaking it', (tester) async {
+    phoneSize(tester);
+    final backend = FakeBackend();
+    await tester.pumpWidget(harness(backend, const WorkspaceShell()));
+    await tester.pumpAndSettle(const Duration(seconds: 1));
+    expect(find.text('Warm welcome:)'), findsOneWidget);
+    backend.offline = true;
+    await tester.fling(find.byType(RefreshIndicator).first, const Offset(0, 600), 1500);
+    for (var i = 0; i < 60 && find.textContaining('Could not reach the Schedio server').evaluate().isEmpty; i++) {
+      await tester.pump(const Duration(seconds: 1));
+    }
+    expect(tester.takeException(), isNull);
+    expect(find.textContaining('Could not reach the Schedio server'), findsOneWidget);
+    backend.offline = false;
+    await tester.tap(find.text('Try again'));
+    await tester.pumpAndSettle(const Duration(seconds: 1));
+    expect(find.text('Warm welcome:)'), findsOneWidget);
+  });
 }

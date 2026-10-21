@@ -93,7 +93,7 @@ These are needed for production but are outside the mobile scope. They are liste
 
 1. **Deploy the mobile API to the production host.** `https://schedio.live/api/v1/*` currently returns an HTML 404. The production build expects the routes above, Laravel Sanctum, and the `MobileAccess` and `scheduling_guard` middleware at `https://schedio.live/api/v1/`.
 2. **Finish the staging host.** `staging.schedio.live` needs its DNS A record and HTTPS certificate before staging builds can be tested on real devices without a local PC server.
-3. **Push notifications (optional).** True push requires an authenticated endpoint to register and remove device tokens, for example `POST /api/v1/devices` with `token` and `platform` and `DELETE /api/v1/devices/{token}`, plus server-side sending through FCM or APNs. Until then, the app raises local notifications for new inbox items when it refreshes.
+3. **Push notifications.** The app already calls `POST /api/v1/devices` (`token`, `platform`) after sign-in and `DELETE /api/v1/devices/{token}` before logout when built with `PUSH_ENABLED=true`. These endpoints do not exist yet; the full contract is in BACKEND_INTEGRATION_HANDOFF.md section 9.
 4. **Unread count endpoint (optional).** The bell badge reads `unread_notifications` from `dashboard`. A lightweight `GET notifications/unread-count` would make the 30 second poll cheaper.
 
 ## Environments

@@ -5,9 +5,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'api.dart';
 import 'device_alerts.dart';
 import 'models.dart';
+import 'push.dart';
 
 final apiProvider = Provider<Api>((ref) => Api());
 final deviceAlertsProvider = Provider((ref) => DeviceAlerts());
+final pushTransportProvider = Provider<PushTransport>(
+  (ref) => const DisabledPushTransport(),
+);
+final pushServiceProvider = Provider<PushService>((ref) {
+  final service = PushService(
+    ref.watch(apiProvider),
+    ref.watch(pushTransportProvider),
+  );
+  ref.onDispose(service.stopListening);
+  return service;
+});
 final repositoryProvider = Provider(
   (ref) => Repository(ref.watch(apiProvider)),
 );
@@ -82,6 +94,9 @@ class AuthController extends AsyncNotifier<Account?> {
   }
 
   Future<void> logout() async {
+    try {
+      await ref.read(pushServiceProvider).unregister();
+    } catch (_) {}
     await ref.read(apiProvider).request('auth/logout', method: 'POST');
     await ref.read(apiProvider).clearToken();
     state = const AsyncData(null);
