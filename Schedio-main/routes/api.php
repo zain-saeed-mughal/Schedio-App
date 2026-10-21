@@ -4,9 +4,20 @@ use App\Http\Controllers\Api\{ActivityController, AuthController, BookingControl
 use App\Http\Middleware\MobileAccess;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('v1')->middleware('throttle:120,1')->group(function () {
-    Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:6,1');
-    Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:6,1');
+$isProd = app()->environment('production');
+$throttleAuth = $isProd ? 'throttle:6,1' : 'throttle:300,1';
+$throttleApi = $isProd ? 'throttle:120,1' : 'throttle:3000,1';
+
+// Top-level aliases for backwards compatibility without v1 prefix
+Route::middleware($throttleAuth)->group(function () {
+    Route::post('auth/login', [AuthController::class, 'login']);
+    Route::post('auth/register', [AuthController::class, 'register']);
+    Route::get('auth/registration-options', [AuthController::class, 'options']);
+});
+
+Route::prefix('v1')->middleware($throttleApi)->group(function () use ($throttleAuth) {
+    Route::post('auth/login', [AuthController::class, 'login'])->middleware($throttleAuth);
+    Route::post('auth/register', [AuthController::class, 'register'])->middleware($throttleAuth);
     Route::get('auth/registration-options', [AuthController::class, 'options']);
     Route::get('public/booking/{username}', [BookingController::class, 'show']);
     Route::get('public/booking-confirmations/{meeting}/ical', [BookingController::class, 'export'])

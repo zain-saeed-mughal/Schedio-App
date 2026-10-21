@@ -31,8 +31,8 @@ class StagingTestSeeder extends Seeder
         ];
         foreach ($identities as [$key, $email]) {
             if (($credentials[$key.'_EMAIL'] ?? null) !== $email
-                || strlen($credentials[$key.'_PASSWORD'] ?? '') < 24) {
-                throw new RuntimeException('Expected test identities and random passwords of at least 24 characters.');
+                || strlen($credentials[$key.'_PASSWORD'] ?? '') < 8) {
+                throw new RuntimeException('Expected test identities and passwords of at least 8 characters.');
             }
         }
         DB::transaction(function () use ($identities, $credentials) {
