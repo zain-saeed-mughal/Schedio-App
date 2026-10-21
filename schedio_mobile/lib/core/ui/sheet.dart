@@ -186,3 +186,58 @@ Future<bool> confirm(
       ],
     ) ??
     false;
+
+Future<T?> showFormSheet<T>(
+  BuildContext context, {
+  required String title,
+  String? subtitle,
+  List<String> initial = const [''],
+  required Widget Function(BuildContext, List<TextEditingController>) builder,
+  required List<Widget> Function(BuildContext, List<TextEditingController>) actions,
+}) => showModalBottomSheet<T>(
+  context: context,
+  isScrollControlled: true,
+  useSafeArea: true,
+  backgroundColor: Colors.transparent,
+  barrierColor: AppColors.slate950.withValues(alpha: 0.8),
+  sheetAnimationStyle: AnimationStyle(
+    duration: AppMotion.page,
+    reverseDuration: AppMotion.scrimOut,
+    curve: AppMotion.signature,
+  ),
+  builder: (_) => _ControllerScope(
+    initial: initial,
+    builder: (c, controllers) => AppSheet(
+      title: title,
+      subtitle: subtitle,
+      actions: actions(c, controllers),
+      child: builder(c, controllers),
+    ),
+  ),
+);
+
+class _ControllerScope extends StatefulWidget {
+  final List<String> initial;
+  final Widget Function(BuildContext, List<TextEditingController>) builder;
+  const _ControllerScope({required this.initial, required this.builder});
+
+  @override
+  State<_ControllerScope> createState() => _ControllerScopeState();
+}
+
+class _ControllerScopeState extends State<_ControllerScope> {
+  late final controllers = [
+    for (final text in widget.initial) TextEditingController(text: text),
+  ];
+
+  @override
+  void dispose() {
+    for (final c in controllers) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context, controllers);
+}

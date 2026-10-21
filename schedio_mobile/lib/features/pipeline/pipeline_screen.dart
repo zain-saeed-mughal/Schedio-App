@@ -72,14 +72,12 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen> {
 
   Future<void> shiftStage(Record r) async {
     var stage = overrides[r.id] ?? r.status;
-    final progress = TextEditingController(text: r.progress ?? '');
-    final value = TextEditingController(text: r.dealValue ?? '');
-    final notes = TextEditingController(text: r.notes ?? '');
-    final result = await showAppSheet<bool>(
+    final extra = await showFormSheet<Json>(
       context,
       title: 'Shift Stage',
       subtitle: r.title,
-      builder: (c) => StatefulBuilder(
+      initial: [r.progress ?? '', r.dealValue ?? '', r.notes ?? ''],
+      builder: (c, fields) => StatefulBuilder(
         builder: (c, set) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -98,39 +96,38 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen> {
               ],
             ),
             const SizedBox(height: 18),
-            AppField(label: 'Progress note', controller: progress, maxLines: 2, maxLength: 500),
+            AppField(label: 'Progress note', controller: fields[0], maxLines: 2, maxLength: 500),
             AppField(
               label: 'Deal value',
-              controller: value,
+              controller: fields[1],
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               prefixIcon: Icons.attach_money_rounded,
             ),
-            AppField(label: 'Notes', controller: notes, maxLines: 3, padding: EdgeInsets.zero),
+            AppField(label: 'Notes', controller: fields[2], maxLines: 3, padding: EdgeInsets.zero),
           ],
         ),
       ),
-      actions: (c) => [
+      actions: (c, fields) => [
         AppButton(
           label: 'Cancel',
           variant: ButtonVariant.secondary,
-          onPressed: () => Navigator.pop(c, false),
+          onPressed: () => Navigator.pop(c),
         ),
         AppButton(
           label: 'Move Deal',
           trailingIcon: Icons.arrow_forward_rounded,
-          onPressed: () => Navigator.pop(c, true),
+          onPressed: () => Navigator.pop(c, <String, dynamic>{
+            for (final (key, field) in [
+              ('progress', fields[0]),
+              ('deal_value', fields[1]),
+              ('notes', fields[2]),
+            ])
+              if (field.text.trim().isNotEmpty) key: field.text.trim(),
+          }),
         ),
       ],
     );
-    final extra = <String, dynamic>{
-      if (progress.text.trim().isNotEmpty) 'progress': progress.text.trim(),
-      if (value.text.trim().isNotEmpty) 'deal_value': value.text.trim(),
-      if (notes.text.trim().isNotEmpty) 'notes': notes.text.trim(),
-    };
-    progress.dispose();
-    value.dispose();
-    notes.dispose();
-    if (result == true) await move(r, stage, extra: extra);
+    if (extra != null) await move(r, stage, extra: extra);
   }
 
   @override

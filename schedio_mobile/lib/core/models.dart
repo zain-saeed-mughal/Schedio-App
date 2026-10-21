@@ -1,5 +1,8 @@
 typedef Json = Map<String, dynamic>;
 
+Json? asMap(Object? value) =>
+    value is Map ? value.map((k, v) => MapEntry('$k', v)) : null;
+
 class Member {
   final int id;
   final String name;
@@ -28,12 +31,12 @@ class Account {
       bookingUsername = j['booking_username'] as String,
       title = j['title'] as String?,
       phone = j['phone'] as String?,
-      company = (j['company'] as Json?)?['name'] as String?,
-      department = (j['department'] as Json?)?['name'] as String?,
+      company = asMap(j['company'])?['name'] as String?,
+      department = asMap(j['department'])?['name'] as String?,
       canAdminister = j['can_administer'] == true,
       canManageRooms = j['can_manage_rooms'] == true,
       preferences = NotificationPreferences.fromJson(
-        j['notification_preferences'] as Json,
+        asMap(j['notification_preferences']) ?? const {},
       );
 }
 
@@ -41,12 +44,12 @@ class NotificationPreferences {
   final bool inApp, email;
   final Map<String, ({bool inApp, bool email})> categories;
   NotificationPreferences.fromJson(Json j)
-    : inApp = (j['channels'] as Json)['in_app'] == true,
-      email = (j['channels'] as Json)['email'] == true,
-      categories = (j['categories'] as Json).map(
+    : inApp = asMap(j['channels'])?['in_app'] == true,
+      email = asMap(j['channels'])?['email'] == true,
+      categories = (asMap(j['categories']) ?? const {}).map(
         (k, v) => MapEntry(k, (
-          inApp: (v as Json)['in_app'] == true,
-          email: v['email'] == true,
+          inApp: asMap(v)?['in_app'] == true,
+          email: asMap(v)?['email'] == true,
         )),
       );
 }
@@ -100,14 +103,14 @@ class Record {
                   j['title'] ??
                   j['company_name'] ??
                   j['name'] ??
-                  (j['data'] as Json?)?['title'] ??
+                  asMap(j['data'])?['title'] ??
                   'Meeting note')
               as String,
       status = (j['status'] ?? j['approval_status'] ?? '') as String,
       description =
           (j['description'] ??
                   j['registration_notes'] ??
-                  (j['data'] as Json?)?['message'] ??
+                  asMap(j['data'])?['message'] ??
                   '')
               as String,
       start = _date(j['start_time']),
@@ -143,17 +146,17 @@ class Record {
       role = j['role'] as String?,
       email = j['email'] as String?,
       jobTitle = j['title'] as String?,
-      isClientMeeting = (j['metadata'] as Json?)?['is_client_meeting'] == true,
-      clientName = (j['metadata'] as Json?)?['client_name'] as String?,
-      clientEmail = (j['metadata'] as Json?)?['client_email'] as String?,
-      clientCompany = (j['metadata'] as Json?)?['client_company'] as String?,
+      isClientMeeting = asMap(j['metadata'])?['is_client_meeting'] == true,
+      clientName = asMap(j['metadata'])?['client_name'] as String?,
+      clientEmail = asMap(j['metadata'])?['client_email'] as String?,
+      clientCompany = asMap(j['metadata'])?['client_company'] as String?,
       roomId = j['room_id'] as int?,
       departmentId = j['department_id'] as int?,
       clientId = j['client_id'] as int?,
       assignedTo = j['assigned_to'] as int?,
       meetingId =
           j['meeting_id'] as int? ??
-          (j['data'] as Json?)?['meeting_id'] as int?,
+          asMap(j['data'])?['meeting_id'] as int?,
       capacity = j['capacity'] as int?,
       participants = (j['participants'] as List? ?? [])
           .map((e) => Member.fromJson(e as Json))
@@ -166,8 +169,9 @@ class Record {
           )
           .toList(),
       owner =
-          ((j['organizer'] ?? j['assignee'] ?? j['assignedTo'] ?? j['author'])
-                  as Json?)?['name']
+          asMap(
+                j['organizer'] ?? j['assignee'] ?? j['assignedTo'] ?? j['author'],
+              )?['name']
               as String?;
   static DateTime? _date(dynamic v) =>
       v is String ? DateTime.tryParse(v)?.toUtc() : null;
@@ -181,12 +185,12 @@ class RecordPage {
           .map((e) => Record.fromJson(e as Json, module))
           .toList(),
       page =
-          ((j['meta'] as Json?)?['current_page'] ?? j['current_page'] ?? 1)
+          (asMap(j['meta'])?['current_page'] ?? j['current_page'] ?? 1)
               as int,
       lastPage =
-          ((j['meta'] as Json?)?['last_page'] ?? j['last_page'] ?? 1) as int,
+          (asMap(j['meta'])?['last_page'] ?? j['last_page'] ?? 1) as int,
       total =
-          ((j['meta'] as Json?)?['total'] ??
+          (asMap(j['meta'])?['total'] ??
                   j['total'] ??
                   (j['data'] as List).length)
               as int;

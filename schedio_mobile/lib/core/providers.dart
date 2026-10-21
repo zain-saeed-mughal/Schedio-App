@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'api.dart';
@@ -13,12 +15,35 @@ final authProvider = AsyncNotifierProvider<AuthController, Account?>(
   AuthController.new,
 );
 
+typedef AuthNotice = ({String status, String message});
+
+final authNoticeProvider = NotifierProvider<AuthNoticeController, AuthNotice?>(
+  AuthNoticeController.new,
+);
+
+class AuthNoticeController extends Notifier<AuthNotice?> {
+  @override
+  AuthNotice? build() => null;
+  void show(String status, String message) =>
+      state = (status: status, message: message);
+  void clear() => state = null;
+}
+
 class AuthController extends AsyncNotifier<Account?> {
   @override
   Future<Account?> build() async {
+    final previous = state.value;
     final api = ref.read(apiProvider);
     api.onSessionExpired = () {
       api.clearToken();
+      ref
+          .read(authNoticeProvider.notifier)
+          .show('expired', 'Your session has ended. Please sign in again.');
+      state = const AsyncData(null);
+    };
+    api.onAccountBlocked = (status, message) {
+      api.clearToken();
+      ref.read(authNoticeProvider.notifier).show(status, message);
       state = const AsyncData(null);
     };
     await api.restore();
@@ -28,9 +53,14 @@ class AuthController extends AsyncNotifier<Account?> {
     } on ApiFailure catch (e) {
       if (e.status == 401 || e.status == 403) {
         await api.clearToken();
-        if (e.status == 403) rethrow;
+        if (e.status == 403) {
+          ref
+              .read(authNoticeProvider.notifier)
+              .show(e.accountStatus ?? 'inactive', e.message);
+        }
         return null;
       }
+      if (previous != null) return previous;
       rethrow;
     }
   }
@@ -47,6 +77,7 @@ class AuthController extends AsyncNotifier<Account?> {
       },
     );
     await api.saveToken(result['token'] as String);
+    ref.read(authNoticeProvider.notifier).clear();
     state = AsyncData(Account.fromJson(result['user'] as Json));
   }
 
@@ -95,9 +126,12 @@ final dashboardProvider = FutureProvider((ref) async {
   final alerts = ref.read(deviceAlertsProvider);
   final dashboard = await repository.dashboard();
   if (account != null) {
-    try {
-      await alerts.sync(repository.api, account);
-    } catch (_) {}
+    unawaited(
+      alerts
+          .sync(repository.api, account)
+          .timeout(const Duration(seconds: 15))
+          .catchError((Object _) {}),
+    );
   }
   return dashboard;
 });

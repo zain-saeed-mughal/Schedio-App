@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/env.dart';
 import '../../core/providers.dart';
 import '../../core/widgets.dart';
 import '../availability/availability_screen.dart';
@@ -26,6 +27,7 @@ class ProfileScreen extends ConsumerWidget {
       if (account.department != null)
         (Icons.groups_2_outlined, account.department!, 'Department'),
       (Icons.public_rounded, account.timezone, 'Timezone'),
+      (Icons.dns_outlined, '${Env.label} · ${Uri.parse(Env.apiBaseUrl).host}', 'Server'),
     ];
     return GlassPage(
       title: 'Your Profile',

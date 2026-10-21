@@ -56,20 +56,19 @@ Future<bool> rejectRequest(
 }
 
 Future<void> askRejection(BuildContext context, WidgetRef ref, Record r) async {
-  final reason = TextEditingController();
-  final value = await showAppSheet<String>(
+  final value = await showFormSheet<String>(
     context,
     title: 'Reject request',
     subtitle: 'The applicant sees this reason when they try to sign in.',
-    builder: (_) => AppField(
+    builder: (_, fields) => AppField(
       label: 'Rejection reason',
-      controller: reason,
+      controller: fields[0],
       labelColor: AppColors.rose400,
       maxLines: 3,
       hint: 'For example, we could not verify your team',
       padding: EdgeInsets.zero,
     ),
-    actions: (c) => [
+    actions: (c, fields) => [
       AppButton(
         label: 'Cancel',
         variant: ButtonVariant.secondary,
@@ -79,11 +78,10 @@ Future<void> askRejection(BuildContext context, WidgetRef ref, Record r) async {
         label: 'Confirm Rejection',
         variant: ButtonVariant.danger,
         haptic: HapticKind.error,
-        onPressed: () => Navigator.pop(c, reason.text.trim()),
+        onPressed: () => Navigator.pop(c, fields[0].text.trim()),
       ),
     ],
   );
-  reason.dispose();
   if (value != null && context.mounted) {
     await rejectRequest(context, ref, r, value);
   }

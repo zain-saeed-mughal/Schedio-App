@@ -73,7 +73,7 @@ void main() {
           maxScrolls: 40,
         );
       }
-      await tester.ensureVisible(finder);
+      await Scrollable.ensureVisible(tester.element(finder), alignment: 0.5);
       await tester.pumpAndSettle(const Duration(milliseconds: 500));
       await tester.tap(finder);
       await tester.pumpAndSettle();
@@ -101,7 +101,7 @@ void main() {
 
     try {
       await tap(find.text('Pipeline'));
-      await tap(find.text('Add New Deal'));
+      await tap(find.text('Add New Deal').first);
       await waitFor(tester, field('Company name'));
       await tester.enterText(
         field('Company name'),
@@ -176,7 +176,7 @@ void main() {
         '$marker edited',
       );
       await tap(find.widgetWithText(DetailRow, 'Meeting notes'));
-      await tap(find.text('New Note'));
+      await tap(find.text('New Note').first);
       await waitFor(tester, field('Agenda'));
       await tester.enterText(
         field('Agenda'),

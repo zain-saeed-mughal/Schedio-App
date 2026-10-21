@@ -42,12 +42,14 @@ class WorkspaceShell extends ConsumerStatefulWidget {
 }
 
 class _WorkspaceShellState extends ConsumerState<WorkspaceShell>
-    with SingleTickerProviderStateMixin {
-  late final transition = AnimationController(
-    vsync: this,
-    duration: AppMotion.page,
-    value: 1,
-  );
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  late final transition =
+      AnimationController(vsync: this, duration: AppMotion.page, value: 1)
+        ..addStatusListener((status) {
+          if (status == AnimationStatus.completed && mounted) {
+            setState(() => previous = null);
+          }
+        });
   ShellTab? previous;
   final visited = <ShellTab>{ShellTab.home};
   bool sheetOpen = false;
@@ -71,13 +73,31 @@ class _WorkspaceShellState extends ConsumerState<WorkspaceShell>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    startPolling();
+  }
+
+  void startPolling() {
+    poll?.cancel();
     poll = Timer.periodic(AppMotion.poll, (_) {
       if (mounted) ref.invalidate(dashboardProvider);
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      startPolling();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      poll?.cancel();
+      poll = null;
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     poll?.cancel();
     transition.dispose();
     super.dispose();

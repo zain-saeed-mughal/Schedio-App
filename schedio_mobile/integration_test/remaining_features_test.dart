@@ -21,7 +21,11 @@ void main() {
   testWidgets(
     'Native meeting creation with inline client and approval assignment',
     (tester) async {
-      expect(Uri.parse(Api.baseUrl).host, '10.0.2.2');
+      expect(
+        ['10.0.2.2', '127.0.0.1', 'localhost'],
+        contains(Uri.parse(Api.baseUrl).host),
+        reason: 'Fixture writes are only allowed against a local server.',
+      );
       await Api().clearToken();
       app.main();
       await tester.pumpAndSettle();
@@ -57,7 +61,7 @@ void main() {
             maxScrolls: 40,
           );
         }
-        await tester.ensureVisible(finder);
+        await Scrollable.ensureVisible(tester.element(finder), alignment: 0.5);
         await tester.pumpAndSettle();
         await tester.tap(finder);
         await tester.pumpAndSettle();
@@ -109,7 +113,7 @@ void main() {
 
       try {
         await tap(find.text('Meetings'));
-        await tap(find.text('Schedule'));
+        await tap(find.text('Schedule').first);
         await waitFor(tester, find.byType(Editor));
         await enter('Title', marker);
         await date('Starts', '10');

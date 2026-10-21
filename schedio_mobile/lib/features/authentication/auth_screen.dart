@@ -16,13 +16,30 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final form = GlobalKey<FormState>();
   final fields = <String, TextEditingController>{};
   bool register = false, company = false, busy = false, obscure = true;
-  String? error, accountStatus;
+  String? error, accountStatus, info;
   int? companyId, departmentId;
   List<Member> companies = [];
   List<({int id, int companyId, String name})> departments = [];
 
   TextEditingController field(String key) =>
       fields.putIfAbsent(key, TextEditingController.new);
+
+  @override
+  void initState() {
+    super.initState();
+    final notice = ref.read(authNoticeProvider);
+    if (notice != null) {
+      if (notice.status == 'expired') {
+        info = notice.message;
+      } else {
+        accountStatus = notice.status;
+        error = notice.message;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ref.read(authNoticeProvider.notifier).clear();
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -67,6 +84,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
   Future<void> submit() async {
     if (!form.currentState!.validate()) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       busy = true;
       error = null;
@@ -248,6 +266,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     icon: Icons.lock_outline_rounded,
                     hint: 'Your password',
                   ),
+                ],
+                if (info != null && error == null) ...[
+                  InlineBanner(kind: BannerKind.info, message: info!),
+                  const SizedBox(height: 16),
                 ],
                 if (error != null) ...[
                   InlineBanner(message: error!),

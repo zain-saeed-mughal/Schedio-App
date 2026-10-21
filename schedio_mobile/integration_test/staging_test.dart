@@ -94,7 +94,7 @@ void main() {
         if (identity.role == 'super_admin') {
           await api.request('admin/registration-requests');
           await openQuickAction(tester, 'My Tasks');
-          await tester.tap(find.text('New Task'));
+          await tester.tap(find.text('New Task').first);
           await tester.pumpAndSettle();
           await tester.enterText(field('Title'), title);
           final save = find.text('Save');
@@ -105,59 +105,90 @@ void main() {
           expect(find.text(title), findsOneWidget);
           final result = await api.request('tasks', query: {'search': title});
           taskId = (result['data'] as List).single['id'] as int;
-          final browser = Dio(
-            BaseOptions(
-              baseUrl: Api.baseUrl.replaceFirst(RegExp(r'/api/v1/?$'), ''),
-              followRedirects: false,
-              validateStatus: (status) => status != null && status < 400,
-              contentType: Headers.formUrlEncodedContentType,
-            ),
-          );
-          final cookies = <String, String>{};
-          browser.interceptors.add(
-            InterceptorsWrapper(
-              onRequest: (options, handler) {
-                options.headers['Cookie'] = cookies.entries
-                    .map((e) => '${e.key}=${e.value}')
-                    .join('; ');
-                handler.next(options);
+          Future<bool> changeViaWebsite() async {
+            final browser = Dio(
+              BaseOptions(
+                baseUrl: Api.baseUrl.replaceFirst(RegExp(r'/api/v1/?$'), ''),
+                followRedirects: false,
+                validateStatus: (status) => status != null && status < 400,
+                contentType: Headers.formUrlEncodedContentType,
+              ),
+            );
+            final cookies = <String, String>{};
+            browser.interceptors.add(
+              InterceptorsWrapper(
+                onRequest: (options, handler) {
+                  options.headers['Cookie'] = cookies.entries
+                      .map((e) => '${e.key}=${e.value}')
+                      .join('; ');
+                  handler.next(options);
+                },
+                onResponse: (response, handler) {
+                  for (final value
+                      in response.headers['set-cookie'] ?? <String>[]) {
+                    final cookie = Cookie.fromSetCookieValue(value);
+                    cookies[cookie.name] = cookie.value;
+                  }
+                  handler.next(response);
+                },
+              ),
+            );
+            final Response<String> login;
+            try {
+              login = await browser.get<String>('/login');
+            } on DioException catch (e) {
+              browser.close();
+              if ((e.response?.statusCode ?? 0) >= 500) return false;
+              rethrow;
+            }
+            final csrf = RegExp(r'name="_token"\s+value="([^"]+)"')
+                .firstMatch(login.data!)!
+                .group(1)!;
+            await browser.post<dynamic>(
+              '/login',
+              data: {
+                '_token': csrf,
+                'email': identity.email,
+                'password': identity.password,
               },
-              onResponse: (response, handler) {
-                for (final value
-                    in response.headers['set-cookie'] ?? <String>[]) {
-                  final cookie = Cookie.fromSetCookieValue(value);
-                  cookies[cookie.name] = cookie.value;
-                }
-                handler.next(response);
+            );
+            final dashboard = await browser.get<String>('/dashboard');
+            final sessionCsrf = RegExp(r'name="csrf-token"\s+content="([^"]+)"')
+                .firstMatch(dashboard.data!)!
+                .group(1)!;
+            await browser.post<dynamic>(
+              '/tasks/$taskId/status',
+              data: {
+                '_token': sessionCsrf,
+                '_method': 'PATCH',
+                'status': 'in_progress',
               },
-            ),
-          );
-          final login = await browser.get<String>('/login');
-          final csrf = RegExp(r'name="_token"\s+value="([^"]+)"')
-              .firstMatch(login.data!)!
-              .group(1)!;
-          await browser.post<dynamic>(
-            '/login',
-            data: {
-              '_token': csrf,
-              'email': identity.email,
-              'password': identity.password,
-            },
-          );
-          final dashboard = await browser.get<String>('/dashboard');
-          final sessionCsrf = RegExp(r'name="csrf-token"\s+content="([^"]+)"')
-              .firstMatch(dashboard.data!)!
-              .group(1)!;
-          await browser.post<dynamic>(
-            '/tasks/$taskId/status',
-            data: {
-              '_token': sessionCsrf,
-              '_method': 'PATCH',
-              'status': 'in_progress',
-            },
-          );
-          await browser.post<dynamic>('/logout', data: {'_token': sessionCsrf});
-          browser.close();
+            );
+            await browser.post<dynamic>('/logout', data: {'_token': sessionCsrf});
+            browser.close();
+            return true;
+          }
+
+          if (!await changeViaWebsite()) {
+            debugPrint('Website pages unavailable locally; changing the task from a second API session.');
+            final other = Api();
+            final session = await other.request(
+              'auth/login',
+              method: 'POST',
+              data: {
+                'email': identity.email,
+                'password': identity.password,
+                'device_name': 'Second session',
+              },
+            );
+            other.token = session['token'] as String;
+            await other.request(
+              'tasks/$taskId/status',
+              method: 'PATCH',
+              data: {'status': 'in_progress'},
+            );
+            await other.request('auth/logout', method: 'POST');
+          }
           await tester.drag(
             find
                 .descendant(

@@ -8,9 +8,13 @@ plugins {
 }
 
 val releaseKeys = Properties()
-val releaseKeyFile = rootProject.file("key.properties")
+val releaseKeyFile = listOfNotNull(
+    rootProject.file("key.properties"),
+    System.getenv("SCHEDIO_KEY_PROPERTIES")?.let { file(it) },
+    file("${System.getProperty("user.home")}/.schedio/key.properties"),
+).firstOrNull { it.exists() } ?: rootProject.file("key.properties")
 if (releaseKeyFile.exists()) {
-    releaseKeys.load(FileInputStream(releaseKeyFile))
+    FileInputStream(releaseKeyFile).use { releaseKeys.load(it) }
 }
 
 android {
