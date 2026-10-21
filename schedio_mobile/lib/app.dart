@@ -126,11 +126,7 @@ class SplashScreen extends StatelessWidget {
       children: [
         AmbientBackdrop(),
         Center(
-          child: SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(strokeWidth: 2.2),
-          ),
+          child: SchedioLoadingIndicator(),
         ),
       ],
     ),

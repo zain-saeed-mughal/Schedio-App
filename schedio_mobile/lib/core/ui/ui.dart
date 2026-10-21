@@ -6,6 +6,7 @@ export 'buttons.dart';
 export 'feedback.dart';
 export 'glass.dart';
 export 'inputs.dart';
+export 'loader.dart';
 export 'metric.dart';
 export 'page.dart';
 export 'pills.dart';

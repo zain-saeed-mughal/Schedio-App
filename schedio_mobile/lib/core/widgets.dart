@@ -80,7 +80,7 @@ class AsyncBody<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) => value.when(
     data: builder,
-    loading: () => loading ?? SkeletonList(padding: pageInsets(context)),
+    loading: () => loading ?? const Center(child: SchedioLoadingIndicator()),
     error: (e, _) => ErrorPanel(message: e.toString(), retry: retry),
   );
 }

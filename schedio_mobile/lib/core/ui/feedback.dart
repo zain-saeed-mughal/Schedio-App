@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
 import 'buttons.dart';
+import 'loader.dart';
 
 OverlayEntry? _activeToast;
 
@@ -553,7 +554,7 @@ class _StaggeredEntranceState extends State<StaggeredEntrance>
   }
 }
 
-class AppRefresh extends StatelessWidget {
+class AppRefresh extends StatefulWidget {
   final Future<void> Function() onRefresh;
   final Widget child;
   final double edgeOffset;
@@ -565,15 +566,43 @@ class AppRefresh extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => RefreshIndicator(
-    onRefresh: () async {
-      try {
-        await onRefresh();
-      } catch (_) {}
-    },
-    color: AppColors.amber400,
-    backgroundColor: AppColors.surface,
-    edgeOffset: edgeOffset,
-    child: child,
+  State<AppRefresh> createState() => _AppRefreshState();
+}
+
+class _AppRefreshState extends State<AppRefresh> {
+  RefreshIndicatorStatus? status;
+
+  bool get visible =>
+      status == RefreshIndicatorStatus.armed ||
+      status == RefreshIndicatorStatus.snap ||
+      status == RefreshIndicatorStatus.refresh;
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    children: [
+      RefreshIndicator.noSpinner(
+        onStatusChange: (value) {
+          if (mounted && value != status) setState(() => status = value);
+        },
+        onRefresh: () async {
+          try {
+            await widget.onRefresh();
+          } catch (_) {}
+        },
+        child: widget.child,
+      ),
+      Positioned(
+        top: widget.edgeOffset + 8,
+        left: 0,
+        right: 0,
+        child: IgnorePointer(
+          child: AnimatedOpacity(
+            opacity: visible ? 1 : 0,
+            duration: AppMotion.popoverIn,
+            child: Center(child: SchedioLoadingIndicator(isLoading: visible)),
+          ),
+        ),
+      ),
+    ],
   );
 }

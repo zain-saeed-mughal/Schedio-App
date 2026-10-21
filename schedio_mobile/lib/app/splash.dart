@@ -180,13 +180,7 @@ class _AnimatedSplashState extends State<AnimatedSplash>
                     bottom: MediaQuery.viewPaddingOf(context).bottom + 48,
                     child: Opacity(
                       opacity: tagline * (widget.ready ? 0 : 1),
-                      child: const Center(
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ),
+                      child: const Center(child: SchedioLoadingIndicator()),
                     ),
                   ),
                 ],

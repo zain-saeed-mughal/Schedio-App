@@ -231,7 +231,7 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen> {
             else if (loading)
               const SizedBox(
                 height: 360,
-                child: SkeletonList(count: 3, padding: EdgeInsets.symmetric(horizontal: AppSpace.gutter)),
+                child: Center(child: SchedioLoadingIndicator()),
               )
             else if (board)
               SizedBox(

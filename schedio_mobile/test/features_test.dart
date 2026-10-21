@@ -20,7 +20,7 @@ void main() {
     phoneSize(tester, height: 2600);
     final backend = FakeBackend();
     await tester.pumpWidget(harness(backend, const WorkspaceShell()));
-    await tester.pumpAndSettle(const Duration(seconds: 1));
+    await settle(tester);
     expect(find.text('Warm welcome:)'), findsOneWidget);
     expect(find.text('7'), findsOneWidget);
     expect(find.text('Quarterly roadmap review'), findsWidgets);
@@ -31,7 +31,7 @@ void main() {
   testWidgets('bottom navigation switches between all four tabs', (tester) async {
     phoneSize(tester);
     await tester.pumpWidget(harness(FakeBackend(), const WorkspaceShell()));
-    await tester.pumpAndSettle(const Duration(seconds: 1));
+    await settle(tester);
     for (final (tab, title) in [
       ('Calendar', 'Calendar Hub'),
       ('Meetings', 'My Meetings'),
@@ -48,7 +48,7 @@ void main() {
   testWidgets('quick actions show the registration queue only to administrators', (tester) async {
     phoneSize(tester);
     await tester.pumpWidget(harness(FakeBackend(), const WorkspaceShell()));
-    await tester.pumpAndSettle(const Duration(seconds: 1));
+    await settle(tester);
     await tester.tap(find.byType(CenterFab));
     await tester.pumpAndSettle(const Duration(seconds: 1));
     expect(find.descendant(of: find.byType(AppSheet), matching: find.text('Registration Queue')), findsOneWidget);
@@ -56,7 +56,7 @@ void main() {
     final employee = FakeBackend(user: userFixture(role: 'employee', admin: false));
     await tester.pumpWidget(Container());
     await tester.pumpWidget(harness(employee, const WorkspaceShell()));
-    await tester.pumpAndSettle(const Duration(seconds: 1));
+    await settle(tester);
     await tester.tap(find.byType(CenterFab));
     await tester.pumpAndSettle(const Duration(seconds: 1));
     expect(find.text('Quick Actions'), findsOneWidget);
@@ -67,7 +67,7 @@ void main() {
     phoneSize(tester, height: 1200);
     final backend = FakeBackend();
     await tester.pumpWidget(harness(backend, const WorkspaceShell()));
-    await tester.pumpAndSettle(const Duration(seconds: 1));
+    await settle(tester);
     await tester.tap(find.text('Pipeline'));
     await tester.pumpAndSettle(const Duration(seconds: 1));
     expect(find.text('Northwind Traders'), findsOneWidget);
@@ -171,7 +171,7 @@ void main() {
     phoneSize(tester);
     final backend = FakeBackend();
     await tester.pumpWidget(harness(backend, const WorkspaceShell()));
-    await tester.pumpAndSettle(const Duration(seconds: 1));
+    await settle(tester);
     expect(find.text('Warm welcome:)'), findsOneWidget);
     backend.offline = true;
     await tester.fling(find.byType(RefreshIndicator).first, const Offset(0, 600), 1500);

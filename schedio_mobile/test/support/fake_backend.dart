@@ -220,3 +220,10 @@ class SilentAlerts extends DeviceAlerts {
   @override
   Future<void> sync(Api api, Account account) async {}
 }
+
+Future<void> settle(WidgetTester tester) async {
+  for (var i = 0; i < 6; i++) {
+    await tester.pump(const Duration(milliseconds: 250));
+  }
+  await tester.pumpAndSettle(const Duration(seconds: 1));
+}

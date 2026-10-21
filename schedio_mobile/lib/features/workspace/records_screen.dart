@@ -285,7 +285,7 @@ class _RecordsScreenState extends ConsumerState<RecordsScreen> {
                   ...header,
                   const SizedBox(
                     height: 420,
-                    child: SkeletonList(padding: EdgeInsets.zero),
+                    child: Center(child: SchedioLoadingIndicator()),
                   ),
                 ],
               ),
@@ -729,7 +729,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                 ],
               ),
             if (error != null) InlineBanner(message: error!),
-            if (busy) const LinearProgressIndicator(minHeight: 2),
+            if (busy) const Center(child: SchedioLoadingIndicator()),
           ];
           return ListView(
             padding: pageInsets(context),

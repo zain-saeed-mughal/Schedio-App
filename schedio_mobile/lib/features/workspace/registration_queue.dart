@@ -143,7 +143,7 @@ class _RegistrationQueueScreenState
             ref.watch(recordsProvider(query)).when(
               loading: () => const SizedBox(
                 height: 360,
-                child: SkeletonList(count: 3, padding: EdgeInsets.zero),
+                child: Center(child: SchedioLoadingIndicator()),
               ),
               error: (e, _) => ErrorPanel(
                 inline: true,

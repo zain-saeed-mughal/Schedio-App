@@ -142,7 +142,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             value.when(
               loading: () => const SizedBox(
                 height: 320,
-                child: SkeletonList(count: 4, padding: EdgeInsets.zero),
+                child: Center(child: SchedioLoadingIndicator()),
               ),
               error: (e, _) => ErrorPanel(
                 inline: true,

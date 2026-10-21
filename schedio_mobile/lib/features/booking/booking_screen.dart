@@ -156,7 +156,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         ],
         if (busy) ...[
           const SizedBox(height: 16),
-          const LinearProgressIndicator(minHeight: 2),
+          const Center(child: SchedioLoadingIndicator()),
         ],
       ],
     ),
