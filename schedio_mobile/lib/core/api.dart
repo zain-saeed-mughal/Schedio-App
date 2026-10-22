@@ -11,7 +11,13 @@ class ApiFailure implements Exception {
   final String message;
   final int? status;
   final String? accountStatus;
-  const ApiFailure(this.message, {this.status, this.accountStatus});
+  final bool unsupported;
+  const ApiFailure(
+    this.message, {
+    this.status,
+    this.accountStatus,
+    this.unsupported = false,
+  });
   @override
   String toString() => message;
 }
@@ -143,18 +149,25 @@ class Api {
         queryParameters: query,
         options: Options(method: method),
       );
-      if (r.data is! Map<String, dynamic>) {
+      final reply = r.data;
+      if (r.statusCode == 204 || reply == null || (reply is String && reply.trim().isEmpty)) {
+        return <String, dynamic>{};
+      }
+      if (reply is! Map<String, dynamic>) {
         throw const ApiFailure('The server returned an unexpected response.');
       }
-      return r.data as Json;
+      return reply;
     } on DioException catch (e) {
       final body = e.response?.data;
+      final status = e.response?.statusCode;
       throw ApiFailure(
         messageFor(e),
-        status: e.response?.statusCode,
+        status: status,
         accountStatus: body is Json && body['account_status'] is String
             ? body['account_status'] as String
             : null,
+        unsupported: status == 404 &&
+            (body is! Json || '${body['message'] ?? ''}'.startsWith('The route')),
       );
     }
   }
@@ -177,10 +190,111 @@ class Repository {
   Repository(this.api);
   Future<Account> me() async =>
       Account.fromJson((await api.request('auth/me'))['data'] as Json);
-  Future<Dashboard> dashboard() async =>
-      Dashboard.fromJson((await api.request('dashboard'))['data'] as Json);
-  Future<Lookups> lookups() async =>
-      Lookups.fromJson((await api.request('lookups'))['data'] as Json);
+  Future<Dashboard> dashboard() async {
+    try {
+      return Dashboard.parse(await api.request('dashboard'));
+    } on ApiFailure catch (e) {
+      if (!e.unsupported) rethrow;
+      return composedDashboard();
+    }
+  }
+
+  Future<Dashboard> composedDashboard() async {
+    final now = DateTime.now();
+    final dayStart = DateTime(now.year, now.month, now.day);
+    final dayEnd = dayStart.add(const Duration(days: 1));
+    Future<int> count(String path, Json query) async {
+      try {
+        final r = await api.request(path, query: {...query, 'per_page': 1});
+        final meta = asMap(r['meta']);
+        final value = meta?['unread_count'] ?? meta?['total'] ?? r['total'] ?? r['count'];
+        return value is int ? value : int.tryParse('$value') ?? 0;
+      } on ApiFailure {
+        return 0;
+      }
+    }
+
+    final (feed, tasks, unread) = await (
+      api.request(
+        'calendar/feed',
+        query: {
+          'start': dayStart.toUtc().toIso8601String(),
+          'end': dayStart.add(const Duration(days: 30)).toUtc().toIso8601String(),
+          'type': 'meetings',
+        },
+      ),
+      count('tasks', {'status': 'pending'}),
+      count('notifications', {'filter': 'unread', 'status': 'unread'}),
+    ).wait;
+    final meetings = [
+      for (final e in (feed['data'] as List? ?? const []).whereType<Json>())
+        if ((e['entity_type'] ?? 'meeting') == 'meeting' &&
+            e['status'] != 'cancelled' &&
+            e['start_time'] is String)
+          e,
+    ]..sort((a, b) => '${a['start_time']}'.compareTo('${b['start_time']}'));
+    DateTime at(Json e, String key) => DateTime.parse(e[key] as String).toLocal();
+    final upcoming = meetings
+        .where((e) => at(e, e['end_time'] is String ? 'end_time' : 'start_time').isAfter(now))
+        .toList();
+    return Dashboard(
+      today: meetings.where((e) {
+        final start = at(e, 'start_time');
+        return !start.isBefore(dayStart) && start.isBefore(dayEnd);
+      }).length,
+      upcoming: upcoming.length,
+      tasks: tasks,
+      unread: unread,
+      meetings: [
+        for (final e in upcoming.take(8)) Record.fromJson(e, Module.meetings),
+      ],
+    );
+  }
+
+  Future<Lookups> lookups() async {
+    final Json j;
+    try {
+      j = {...resultOf(await api.request('lookups'))};
+    } on ApiFailure catch (e) {
+      if (!e.unsupported) rethrow;
+      return composedLookups();
+    }
+    if (j['clients'] is! List) j['clients'] = await namedList('clients');
+    return Lookups.fromJson(j);
+  }
+
+  Future<List<Json>> namedList(String path) async {
+    try {
+      final r = await api.request(path, query: {'per_page': 100});
+      final data = r['data'];
+      return [
+        for (final item in data is List ? data : const [])
+          if (item is Json && item['id'] is int)
+            {
+              'id': item['id'],
+              'name': '${item['name'] ?? item['company_name'] ?? item['title'] ?? '#${item['id']}'}',
+            },
+      ];
+    } on ApiFailure {
+      return const [];
+    }
+  }
+
+  Future<Lookups> composedLookups() async {
+    final (users, departments, rooms, clients) = await (
+      namedList('users'),
+      namedList('departments'),
+      namedList('rooms'),
+      namedList('clients'),
+    ).wait;
+    return Lookups.fromJson({
+      'users': users,
+      'departments': departments,
+      'rooms': rooms,
+      'clients': clients,
+    });
+  }
+
   Future<RecordPage> list(
     Module module, {
     int page = 1,
@@ -194,6 +308,7 @@ class Repository {
         'page': page,
         if (search.isNotEmpty) 'search': search,
         if (status.isNotEmpty) 'status': status,
+        if (status.isNotEmpty && module == Module.notifications) 'filter': status,
       },
     ),
     module,

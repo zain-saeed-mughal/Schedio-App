@@ -43,7 +43,7 @@ class _BookingLinkCardState extends State<BookingLinkCard> {
         ),
       );
     } catch (e) {
-      if (mounted) showToast(context, '$e', error: true);
+      if (mounted) showToast(context, friendlyError(e), error: true);
     }
   }
 

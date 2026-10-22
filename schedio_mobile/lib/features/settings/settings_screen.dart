@@ -4,21 +4,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
 import '../../core/widgets.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => GlassPage(
+  Widget build(BuildContext context, WidgetRef ref) => GlassPage(
     title: 'Settings',
     subtitle: 'Notifications and delivery',
     body: ListView(
       padding: pageInsets(context),
-      children: const [
-        ScreenHeader(
+      children: [
+        const ScreenHeader(
           title: 'Settings',
           subtitle: 'Choose how Schedio keeps you in the loop.',
         ),
-        NotificationPreferencesPanel(),
+        if (ref.watch(authProvider).value == null)
+          const Center(child: SchedioLoadingIndicator())
+        else
+          const NotificationPreferencesPanel(),
       ],
     ),
   );
@@ -68,7 +71,7 @@ class _NotificationPreferencesPanelState
     } catch (e) {
       if (mounted) {
         setState(() {
-          message = e.toString();
+          message = friendlyError(e);
           failed = true;
         });
       }
@@ -91,6 +94,7 @@ class _NotificationPreferencesPanelState
             data: {
               'channel_in_app': inApp,
               'channel_email': email,
+              'channels': {'in_app': inApp, 'email': email},
               'categories': {
                 for (final e in categories.entries)
                   e.key: {'in_app': e.value.inApp, 'email': e.value.email},
@@ -105,7 +109,7 @@ class _NotificationPreferencesPanelState
     } catch (e) {
       if (mounted) {
         setState(() {
-          message = e.toString();
+          message = friendlyError(e);
           failed = true;
         });
       }

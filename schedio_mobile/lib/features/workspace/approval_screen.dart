@@ -52,7 +52,7 @@ class _ApprovalScreenState extends ConsumerState<ApprovalScreen> {
       ref.read(refreshProvider.notifier).refresh();
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      if (mounted) setState(() => error = e.toString());
+      if (mounted) setState(() => error = friendlyError(e));
     } finally {
       if (mounted) setState(() => busy = false);
     }

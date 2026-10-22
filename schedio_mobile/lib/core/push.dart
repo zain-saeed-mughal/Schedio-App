@@ -46,6 +46,7 @@ abstract class PushTransport {
   Stream<PushMessage> get onMessageOpened;
   Future<PushMessage?> initialMessage();
   Future<void> deleteToken();
+  Future<void> showForeground(PushMessage message);
 }
 
 class DisabledPushTransport implements PushTransport {
@@ -66,6 +67,8 @@ class DisabledPushTransport implements PushTransport {
   Future<PushMessage?> initialMessage() async => null;
   @override
   Future<void> deleteToken() async {}
+  @override
+  Future<void> showForeground(PushMessage message) async {}
 }
 
 class PushService {
@@ -92,10 +95,16 @@ class PushService {
     final token = await transport.token();
     if (token != null) await register(token);
     _subscriptions
-      ..add(transport.onTokenRefresh.listen(register))
+      ..add(
+        transport.onTokenRefresh.listen(
+          (token) => register(token).catchError((Object _) {}),
+        ),
+      )
       ..add(
         transport.onForegroundMessage.listen((m) {
-          if (firstTime(m)) onForeground?.call(m);
+          if (!firstTime(m)) return;
+          transport.showForeground(m).catchError((Object _) {});
+          onForeground?.call(m);
         }),
       )
       ..add(

@@ -126,7 +126,7 @@ class ProfileScreen extends ConsumerWidget {
               try {
                 await ref.read(authProvider.notifier).logout();
               } catch (e) {
-                if (context.mounted) showToast(context, '$e', error: true);
+                if (context.mounted) showToast(context, friendlyError(e), error: true);
               }
             },
           ),

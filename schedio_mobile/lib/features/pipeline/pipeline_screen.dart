@@ -66,7 +66,7 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen> {
       if (!mounted) return;
       setState(() => overrides.remove(r.id));
       haptic(HapticKind.error);
-      showToast(context, '$e', error: true);
+      showToast(context, friendlyError(e), error: true);
     }
   }
 
@@ -174,7 +174,7 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen> {
               ),
             ),
             SizedBox(
-              height: 92,
+              height: context.textHeight(92, 86),
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: AppSpace.gutter),

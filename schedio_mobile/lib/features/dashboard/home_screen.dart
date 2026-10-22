@@ -133,9 +133,13 @@ class _Hero extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const LiveDot(size: 6),
-                Text(
-                  'Executive Calendar Workspace',
-                  style: AppText.tiny.copyWith(color: AppColors.amber300, fontSize: 10.5),
+                Flexible(
+                  child: Text(
+                    'Executive Calendar Workspace',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.tiny.copyWith(color: AppColors.amber300, fontSize: 10.5),
+                  ),
                 ),
               ],
             ),
@@ -424,7 +428,7 @@ class _QuickScheduleState extends State<_QuickSchedule> {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 64,
+            height: context.textHeight(64, 32),
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: 7,

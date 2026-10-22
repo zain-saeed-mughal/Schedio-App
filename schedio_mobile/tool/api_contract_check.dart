@@ -63,10 +63,14 @@ const routes = [
   Route('PATCH', 'tasks/{id}/status'),
   Route('GET', 'rooms', keys: ['data']),
   Route('POST', 'rooms'),
+  Route('GET', 'rooms/{id}'),
   Route('PUT', 'rooms/{id}'),
+  Route('DELETE', 'rooms/{id}'),
   Route('GET', 'events', keys: ['data']),
   Route('POST', 'events'),
+  Route('GET', 'events/{id}'),
   Route('PUT', 'events/{id}'),
+  Route('DELETE', 'events/{id}'),
   Route('GET', 'notifications', keys: ['data']),
   Route('POST', 'notifications/mark-all-read'),
   Route('POST', 'notifications/preferences'),
@@ -91,6 +95,8 @@ Future<({int status, String type, Object? body})> fetch(
 }) async {
   final request = await client.getUrl(uri);
   request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+  final host = Platform.environment['SCHEDIO_HOST'];
+  if (host != null && host.isNotEmpty) request.headers.host = host;
   if (token != null) request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
   request.followRedirects = false;
   final response = await request.close().timeout(const Duration(seconds: 20));
@@ -110,6 +116,7 @@ String classify(({int status, String type, Object? body}) r) {
   if (r.status == 404 && (r.type != 'application/json' || message.startsWith('The route'))) {
     return 'MISSING';
   }
+  if (r.status == 404) return 'PRESENT (record not found)';
   if (r.status >= 500) return 'ERROR';
   if (r.type != 'application/json') return 'NOT JSON';
   return 'PRESENT';
@@ -119,6 +126,7 @@ Future<void> main(List<String> args) async {
   if (args.isEmpty) {
     stderr.writeln('Usage: dart run tool/api_contract_check.dart <base url ending in /api/v1/>');
     stderr.writeln('Optional: set SCHEDIO_TOKEN to also check read-only endpoints with a bearer token.');
+    stderr.writeln('Optional: set SCHEDIO_HOST to send a Host header, to probe a server by IP before its DNS exists.');
     exit(64);
   }
   final base = Uri.parse(args.first.endsWith('/') ? args.first : '${args.first}/');
@@ -127,6 +135,8 @@ Future<void> main(List<String> args) async {
   var missing = 0, problems = 0;
   stdout.writeln('Schedio mobile API contract check');
   stdout.writeln('Server: $base');
+  final host = Platform.environment['SCHEDIO_HOST'];
+  if (host != null && host.isNotEmpty) stdout.writeln('Host header: $host');
   stdout.writeln('Time: ${DateTime.now().toUtc().toIso8601String()}');
   stdout.writeln('');
   stdout.writeln('| Method | Endpoint | Route | Probe | Authenticated read |');

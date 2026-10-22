@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:schedio_mobile/app/push_routing.dart';
 import 'package:schedio_mobile/core/api.dart';
 import 'package:schedio_mobile/core/models.dart';
+import 'package:schedio_mobile/core/firebase_push.dart';
 import 'package:schedio_mobile/core/push.dart';
 import 'package:schedio_mobile/features/workspace/records_screen.dart';
 
@@ -33,6 +34,9 @@ class FakeTransport implements PushTransport {
   Future<PushMessage?> initialMessage() async => initial;
   @override
   Future<void> deleteToken() async => deleted = true;
+  final shown = <PushMessage>[];
+  @override
+  Future<void> showForeground(PushMessage message) async => shown.add(message);
 }
 
 void main() {
@@ -67,6 +71,32 @@ void main() {
     expect(push.registeredToken, 'token-2');
   });
 
+  test('a token refresh while offline does not raise an unhandled error', () async {
+    var offline = false;
+    final flaky = Api(
+      client: Dio(BaseOptions(baseUrl: 'https://example.test/api/v1/'))
+        ..httpClientAdapter = ScriptedAdapter((o) {
+          if (offline) throw DioException(requestOptions: o, type: DioExceptionType.connectionError);
+          return json({'message': 'ok'}, 200);
+        }),
+    )..token = 'session';
+    final transport = FakeTransport();
+    final push = PushService(flaky, transport, enabled: true);
+    await push.start();
+    offline = true;
+    final errors = <Object>[];
+    await runZonedGuarded(() async {
+      transport.refresh.add('token-2');
+      await settle();
+    }, (e, _) => errors.add(e));
+    expect(errors, isEmpty);
+    expect(push.registeredToken, 'token-1');
+    offline = false;
+    transport.refresh.add('token-3');
+    await settle();
+    expect(push.registeredToken, 'token-3');
+  });
+
   test('foreground duplicates are shown once and taps are routed', () async {
     final transport = FakeTransport();
     final push = PushService(api, transport, enabled: true);
@@ -83,6 +113,7 @@ void main() {
     await settle();
     expect(shown, hasLength(1));
     expect(openedMessages.single.targetId, '11');
+    expect(transport.shown, hasLength(1), reason: 'one system notification per message');
   });
 
   test('a cold start from a notification tap opens it', () async {
@@ -121,5 +152,20 @@ void main() {
     final task = screenForPush(PushMessage.fromData({'type': 'task_assigned', 'task_id': 7}));
     expect((task as RecordScreen).initial.module, Module.tasks);
     expect(screenForPush(const PushMessage(type: 'other')), isA<RecordsScreen>());
+  });
+  test('a tapped foreground notification keeps its routing data', () {
+    final original = PushMessage.fromData(
+      {'notification_id': 'n9', 'type': 'meeting_reminder', 'meeting_id': 42},
+      title: 'Meeting in 15 minutes',
+      body: 'Open Schedio for details',
+    );
+    final back = FirebasePushTransport.fromPayload(FirebasePushTransport.toPayload(original))!;
+    expect(back.notificationId, 'n9');
+    expect(back.type, 'meeting_reminder');
+    expect(back.targetId, '42');
+    expect(back.title, 'Meeting in 15 minutes');
+    expect(back.dedupeKey, original.dedupeKey);
+    expect(FirebasePushTransport.fromPayload('not json'), isNull);
+    expect(FirebasePushTransport.fromPayload(null), isNull);
   });
 }

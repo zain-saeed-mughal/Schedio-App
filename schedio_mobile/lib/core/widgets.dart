@@ -1,13 +1,24 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:url_launcher/url_launcher.dart';
 
+import 'api.dart';
 import 'models.dart';
 import 'ui/ui.dart';
 
 export 'ui/ui.dart';
+
+String friendlyError(Object error) {
+  if (error is ApiFailure) return error.message;
+  if (kDebugMode) debugPrint('Unexpected error: $error');
+  if (error is TypeError || error is FormatException) {
+    return 'The server sent a response this app could not read. Please try again later.';
+  }
+  return 'Something went wrong. Please try again.';
+}
 
 String label(String value) => value.replaceAll('_', ' ');
 
@@ -81,7 +92,7 @@ class AsyncBody<T> extends StatelessWidget {
   Widget build(BuildContext context) => value.when(
     data: builder,
     loading: () => loading ?? const Center(child: SchedioLoadingIndicator()),
-    error: (e, _) => ErrorPanel(message: e.toString(), retry: retry),
+    error: (e, _) => ErrorPanel(message: friendlyError(e), retry: retry),
   );
 }
 

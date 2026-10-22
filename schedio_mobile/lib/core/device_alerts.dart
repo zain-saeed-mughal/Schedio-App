@@ -1,8 +1,27 @@
+import 'dart:async';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
 import 'models.dart';
+
+const pushChannelId = 'schedio_high_importance_channel';
+
+final localNotificationTaps = StreamController<String?>.broadcast();
+
+Future<void> initializeLocalNotifications(FlutterLocalNotificationsPlugin plugin) =>
+    plugin.initialize(
+      settings: const InitializationSettings(
+        android: AndroidInitializationSettings('ic_stat_schedio'),
+        iOS: DarwinInitializationSettings(
+          requestAlertPermission: false,
+          requestSoundPermission: false,
+          requestBadgePermission: false,
+        ),
+      ),
+      onDidReceiveNotificationResponse: (r) => localNotificationTaps.add(r.payload),
+    );
 
 /// Opt-in presentation of newly received server inbox items. This never schedules
 /// reminders, polls in the background, or replaces Laravel's reminder engine.
@@ -12,16 +31,7 @@ class DeviceAlerts {
   bool initialized = false, syncing = false;
   Future<void> initialize() async {
     if (initialized) return;
-    await plugin.initialize(
-      settings: const InitializationSettings(
-        android: AndroidInitializationSettings('ic_stat_schedio'),
-        iOS: DarwinInitializationSettings(
-          requestAlertPermission: false,
-          requestSoundPermission: false,
-          requestBadgePermission: false,
-        ),
-      ),
-    );
+    await initializeLocalNotifications(plugin);
     initialized = true;
   }
 

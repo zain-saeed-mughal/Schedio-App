@@ -10,5 +10,6 @@ export 'loader.dart';
 export 'metric.dart';
 export 'page.dart';
 export 'pills.dart';
+export 'responsive.dart';
 export 'segmented.dart';
 export 'sheet.dart';

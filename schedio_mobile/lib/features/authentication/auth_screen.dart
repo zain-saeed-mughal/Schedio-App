@@ -55,17 +55,20 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       error = null;
     });
     try {
-      final j =
-          (await ref
-                  .read(apiProvider)
-                  .request('auth/registration-options'))['data']
-              as Json;
+      final response = await ref
+          .read(apiProvider)
+          .request('auth/registration-options');
+      final data = response['data'];
+      if (data != null && data is! Map && !(data is List && data.isEmpty)) {
+        throw const FormatException('registration options');
+      }
+      final j = asMap(data) ?? (data == null ? response : const <String, dynamic>{});
       if (!mounted) return;
       setState(() {
-        companies = (j['companies'] as List)
+        companies = (j['companies'] as List? ?? const [])
             .map((e) => Member.fromJson(e as Json))
             .toList();
-        departments = (j['departments'] as List)
+        departments = (j['departments'] as List? ?? const [])
             .map(
               (e) => (
                 id: e['id'] as int,
@@ -76,7 +79,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             .toList();
       });
     } catch (e) {
-      if (mounted) setState(() => error = e.toString());
+      if (mounted) setState(() => error = friendlyError(e));
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -119,7 +122,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => error = e.toString());
+      if (mounted) setState(() => error = friendlyError(e));
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -197,6 +200,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         SafeArea(
           child: Center(
             child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: const EdgeInsets.fromLTRB(20, 28, 20, 32),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 460),
@@ -295,14 +299,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         ),
       ),
       const SizedBox(height: 20),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      Wrap(
+        alignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          Flexible(
-            child: Text(
-              register ? 'Already registered?' : 'New to your team workspace?',
-              style: AppText.helper,
-            ),
+          Text(
+            register ? 'Already registered?' : 'New to your team workspace?',
+            textAlign: TextAlign.center,
+            style: AppText.helper,
           ),
           TextButton(
             onPressed: busy ? null : toggleMode,

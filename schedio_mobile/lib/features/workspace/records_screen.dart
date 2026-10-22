@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/api.dart';
 import '../../core/models.dart';
 import '../../core/providers.dart';
 import '../../core/widgets.dart';
@@ -146,7 +147,7 @@ class _RecordsScreenState extends ConsumerState<RecordsScreen> {
       ref.read(refreshProvider.notifier).refresh();
       if (mounted) showToast(context, 'All caught up.');
     } catch (e) {
-      if (mounted) showToast(context, '$e', error: true);
+      if (mounted) showToast(context, friendlyError(e), error: true);
     }
   }
 
@@ -268,7 +269,13 @@ class _RecordsScreenState extends ConsumerState<RecordsScreen> {
     final body = preferences
         ? ListView(
             padding: pageInsets(context),
-            children: [...header, const NotificationPreferencesPanel()],
+            children: [
+              ...header,
+              if (ref.watch(authProvider).value == null)
+                const Center(child: SchedioLoadingIndicator())
+              else
+                const NotificationPreferencesPanel(),
+            ],
           )
         : AppRefresh(
             edgeOffset: topChrome(context),
@@ -295,7 +302,7 @@ class _RecordsScreenState extends ConsumerState<RecordsScreen> {
                   ...header,
                   ErrorPanel(
                 inline: true,
-                    message: '$e',
+                    message: friendlyError(e),
                     retry: () => ref.invalidate(recordsProvider(query)),
                   ),
                 ],
@@ -426,8 +433,8 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
       return true;
     } catch (e) {
       if (mounted) {
-        setState(() => error = e.toString());
-        showToast(context, e.toString(), error: true);
+        setState(() => error = friendlyError(e));
+        showToast(context, friendlyError(e), error: true);
       }
       return false;
     } finally {
@@ -448,7 +455,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
       title: copy.singular,
       subtitle: copy.title,
       body: AsyncBody<Record>(
-        value: hasDetail ? ref.watch(provider) : AsyncData(initial),
+        value: detailOrInitial(hasDetail ? ref.watch(provider) : null, initial),
         retry: () => ref.invalidate(provider),
         builder: (r) {
           final zone = ref.watch(authProvider).value?.timezone ?? 'UTC';
@@ -629,7 +636,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                       spacing: 8,
                       runSpacing: 8,
                       children: [
-                        for (final s in r.module == Module.clients ? clientStatuses : taskStatuses)
+                        for (final s in r.module == Module.clients ? clientStatuses : taskStatusesFor(r.status, server: ref.watch(lookupsProvider).value?.taskStatuses ?? const []))
                           FilterPill(
                             label: titleCase(s),
                             selected: r.status == s,
@@ -812,17 +819,20 @@ class _HeroCard extends StatelessWidget {
                           ? Tint.purple
                           : Tint.warning,
                     ),
-              const Spacer(),
+              const SizedBox(width: 12),
               if (r.start != null && r.module != Module.notes)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      r.isAllDay ? 'All day' : timeLabel(r.start, timezone),
-                      style: AppText.monoData.copyWith(fontSize: 14, fontWeight: FontWeight.w700),
-                    ),
-                    Text(shortDay(r.start, timezone), style: AppText.monoTiny),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        r.isAllDay ? 'All day' : timeLabel(r.start, timezone),
+                        textAlign: TextAlign.end,
+                        style: AppText.monoData.copyWith(fontSize: 14, fontWeight: FontWeight.w700),
+                      ),
+                      Text(shortDay(r.start, timezone), textAlign: TextAlign.end, style: AppText.monoTiny),
+                    ],
+                  ),
                 ),
             ],
           ),
@@ -838,9 +848,13 @@ class _HeroCard extends StatelessWidget {
               children: [
                 Text('PIPELINE FLOW', style: AppText.tiny),
                 const SizedBox(width: 8),
-                Text(
-                  StageStyle.of(r.status).label,
-                  style: AppText.tiny.copyWith(color: AppColors.amber400),
+                Flexible(
+                  child: Text(
+                    StageStyle.of(r.status).label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.tiny.copyWith(color: AppColors.amber400),
+                  ),
                 ),
               ],
             ),
@@ -1037,4 +1051,11 @@ class _RsvpCard extends StatelessWidget {
       ),
     ),
   );
+}
+
+AsyncValue<Record> detailOrInitial(AsyncValue<Record>? detail, Record initial) {
+  if (detail == null) return AsyncData(initial);
+  final error = detail.error;
+  if (detail.hasError && error is ApiFailure && error.unsupported) return AsyncData(initial);
+  return detail;
 }

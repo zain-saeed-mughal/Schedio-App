@@ -146,7 +146,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               ),
               error: (e, _) => ErrorPanel(
                 inline: true,
-                message: '$e',
+                message: friendlyError(e),
                 retry: () => ref.invalidate(calendarProvider(query)),
               ),
               data: (events) {
@@ -272,10 +272,12 @@ class _Header extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Flexible(child: Text('Calendar Hub', style: AppText.pageTitle)),
-                  const SizedBox(width: 8),
+                  Text('Calendar Hub', style: AppText.pageTitle),
                   const StatusPill(text: 'Interactive', tint: Tint.warning, dot: true),
                 ],
               ),
@@ -813,38 +815,45 @@ class _EventBlockState extends State<_EventBlock> {
             ],
           ),
           child: ClipRect(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
+            child: LayoutBuilder(
+              builder: (context, box) => OverflowBox(
+                alignment: Alignment.topLeft,
+                minHeight: 0,
+                maxHeight: double.infinity,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (e.module == Module.meetings) ...[
-                      const Icon(Icons.videocam_rounded, size: 11, color: Colors.white),
-                      const SizedBox(width: 4),
-                    ],
-                    Expanded(
-                      child: Text(
-                        e.title,
+                    Row(
+                      children: [
+                        if (e.module == Module.meetings) ...[
+                          const Icon(Icons.videocam_rounded, size: 11, color: Colors.white),
+                          const SizedBox(width: 4),
+                        ],
+                        Expanded(
+                          child: Text(
+                            e.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.tiny.copyWith(
+                              fontSize: 11,
+                              color: Colors.white,
+                              letterSpacing: 0,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (!widget.compact && box.maxHeight >= 27)
+                      Text(
+                        '${timeLabel(e.start, widget.timezone)} to ${timeLabel(e.end, widget.timezone)}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: AppText.tiny.copyWith(
-                          fontSize: 11,
-                          color: Colors.white,
-                          letterSpacing: 0,
-                        ),
+                        style: AppText.monoTiny.copyWith(color: AppColors.eventClientText),
                       ),
-                    ),
                   ],
                 ),
-                if (!widget.compact)
-                  Text(
-                    '${timeLabel(e.start, widget.timezone)} to ${timeLabel(e.end, widget.timezone)}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppText.monoTiny.copyWith(color: AppColors.eventClientText),
-                  ),
-              ],
+              ),
             ),
           ),
         ),

@@ -11,7 +11,7 @@ import 'package:schedio_mobile/core/widgets.dart';
 import 'package:schedio_mobile/features/workspace/editor.dart';
 import 'package:schedio_mobile/main.dart' as app;
 
-import 'staging_test.dart' show field, signIn, waitFor;
+import 'staging_test.dart' show field, signIn, waitFor, waitForSignIn;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -27,7 +27,7 @@ void main() {
     ], contains(Uri.parse(Api.baseUrl).host));
     await Api().clearToken();
     app.main();
-    await tester.pumpAndSettle();
+    await waitForSignIn(tester);
     await tester.enterText(
       find.byType(TextFormField).at(0),
       const String.fromEnvironment('ADMIN_A_EMAIL'),

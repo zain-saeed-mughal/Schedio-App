@@ -50,7 +50,7 @@ Future<bool> rejectRequest(
     if (context.mounted) showToast(context, 'Request from ${r.title} rejected.');
     return true;
   } catch (e) {
-    if (context.mounted) showToast(context, '$e', error: true);
+    if (context.mounted) showToast(context, friendlyError(e), error: true);
     return false;
   }
 }
@@ -147,7 +147,7 @@ class _RegistrationQueueScreenState
               ),
               error: (e, _) => ErrorPanel(
                 inline: true,
-                message: '$e',
+                message: friendlyError(e),
                 retry: () => ref.invalidate(recordsProvider(query)),
               ),
               data: (page) {
@@ -673,9 +673,11 @@ class RegistrationQueueBanner extends ConsumerWidget {
     ),
     semanticLabel: 'Registration Queue, $pending pending',
     padding: const EdgeInsets.fromLTRB(20, 20, 12, 20),
-    child: SizedBox(
-      height: 112,
-      child: Row(
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 112),
+      child: IntrinsicHeight(
+        child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
             child: Column(
@@ -690,6 +692,7 @@ class RegistrationQueueBanner extends ConsumerWidget {
                   maxLines: 2,
                   style: AppText.body.copyWith(fontSize: 13),
                 ),
+                const SizedBox(height: 12),
                 const Spacer(),
                 Container(
                   width: 40,
@@ -708,8 +711,9 @@ class RegistrationQueueBanner extends ConsumerWidget {
               ],
             ),
           ),
-          const GlassTileArt(size: 104),
+          const Center(child: GlassTileArt(size: 104)),
         ],
+        ),
       ),
     ),
   );

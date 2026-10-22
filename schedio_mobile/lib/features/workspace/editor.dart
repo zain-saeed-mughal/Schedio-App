@@ -23,6 +23,14 @@ const taskStatuses = [
   'completed',
   'cancelled',
 ];
+const officialTaskStatuses = ['pending', 'in_progress', 'completed'];
+
+List<String> taskStatusesFor(String current, {List<String> server = const []}) =>
+    server.isNotEmpty
+    ? server
+    : taskStatuses.contains(current)
+    ? taskStatuses
+    : officialTaskStatuses;
 const eventCategories = [
   'company_holiday',
   'deadline',
@@ -58,9 +66,34 @@ class _EditorState extends ConsumerState<Editor> {
   final participantIds = <int>{};
   DateTime? start, end, due;
   bool busy = false;
-  String? error;
+  String? error, baseline;
   List<Slot> suggestions = [];
   String get zone => ref.read(authProvider).value?.timezone ?? 'UTC';
+
+  String snapshot() => [
+    for (final e in fields.entries) '${e.key}=${e.value.text}',
+    for (final e in values.entries) '${e.key}=${e.value}',
+    (participantIds.toList()..sort()).join(','),
+    start,
+    end,
+    due,
+  ].join('|');
+
+  bool get dirty => baseline != null && snapshot() != baseline;
+
+  Future<void> leave() async {
+    if (busy) return;
+    if (!dirty ||
+        await confirm(
+          context,
+          'Discard changes?',
+          message: 'Your edits have not been saved.',
+          confirmLabel: 'Discard',
+          destructive: true,
+        )) {
+      if (mounted) Navigator.pop(context);
+    }
+  }
 
   @override
   void initState() {
@@ -264,7 +297,7 @@ class _EditorState extends ConsumerState<Editor> {
           );
       if (!mounted) return;
       setState(
-        () => suggestions = (response['data'] as List)
+        () => suggestions = slotsOf(response)
             .map((s) => Slot.fromJson(s as Json))
             .take(6)
             .toList(),
@@ -423,7 +456,7 @@ class _EditorState extends ConsumerState<Editor> {
         }
       }
     } catch (e) {
-      if (mounted) showError(e.toString());
+      if (mounted) showError(friendlyError(e));
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -701,7 +734,12 @@ class _EditorState extends ConsumerState<Editor> {
     final m = widget.module;
     final meeting = m == Module.meetings;
     final title = '${widget.record == null ? 'New' : 'Edit'} ${ModuleTitle.of(m).toLowerCase()}';
-    return GlassPage(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) leave();
+      },
+      child: GlassPage(
       title: title,
       subtitle: [Module.meetings, Module.events].contains(m) ? zone : null,
       bottomBar: Row(
@@ -711,7 +749,7 @@ class _EditorState extends ConsumerState<Editor> {
             child: AppButton(
               label: 'Cancel',
               variant: ButtonVariant.secondary,
-              onPressed: busy ? null : () => Navigator.maybePop(context),
+              onPressed: busy ? null : leave,
             ),
           ),
           const SizedBox(width: 12),
@@ -731,10 +769,17 @@ class _EditorState extends ConsumerState<Editor> {
       body: AsyncBody(
         value: ref.watch(lookupsProvider),
         retry: () => ref.invalidate(lookupsProvider),
-        builder: (l) => Form(
+        builder: (l) {
+          if (baseline == null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) baseline ??= snapshot();
+            });
+          }
+          return Form(
           key: form,
           child: ListView(
             controller: scroll,
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: pageInsets(context, bottom: 110),
             children: [
               ScreenHeader(
@@ -782,7 +827,9 @@ class _EditorState extends ConsumerState<Editor> {
               ...formFor(l),
             ],
           ),
-        ),
+          );
+        },
+      ),
       ),
     );
   }

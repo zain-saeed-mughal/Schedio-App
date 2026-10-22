@@ -81,7 +81,6 @@ class _WorkspaceShellState extends ConsumerState<WorkspaceShell>
       ..onOpen = openFromPush
       ..onForeground = (message) {
         ref.invalidate(dashboardProvider);
-        if (mounted && message.title != null) showToast(context, message.title!);
       };
     unawaited(push.start().catchError((Object _) {}));
   }
@@ -505,7 +504,7 @@ class QuickActionsGrid extends ConsumerWidget {
                     await auth.logout();
                   } catch (e) {
                     if (messenger.mounted) {
-                      showToast(messenger, '$e', error: true);
+                      showToast(messenger, friendlyError(e), error: true);
                     }
                   }
                 },

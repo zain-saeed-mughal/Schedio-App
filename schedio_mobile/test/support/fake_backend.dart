@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -91,6 +92,7 @@ List<Map<String, dynamic>> clientFixtures(String status) => status == 'discovery
 
 class FakeBackend implements HttpClientAdapter {
   final requests = <RequestOptions>[];
+  final routes = <String, FutureOr<(int, Object?)> Function(RequestOptions)>{};
   bool offline = false;
   final Map<String, dynamic> user;
   FakeBackend({Map<String, dynamic>? user}) : user = user ?? userFixture();
@@ -162,9 +164,11 @@ class FakeBackend implements HttpClientAdapter {
     if (offline) {
       throw DioException(requestOptions: o, type: DioExceptionType.connectionError);
     }
+    final route = routes['${o.method} ${o.path}'];
+    final (status, body) = route != null ? await route(o) : (200, respond(o));
     return ResponseBody.fromString(
-      jsonEncode(respond(o)),
-      200,
+      status == 204 ? '' : jsonEncode(body),
+      status,
       headers: {
         Headers.contentTypeHeader: [Headers.jsonContentType],
       },

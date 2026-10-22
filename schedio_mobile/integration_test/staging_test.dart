@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:schedio_mobile/app.dart';
 import 'package:schedio_mobile/app/nav_bar.dart';
+import 'package:schedio_mobile/app/splash.dart';
 import 'package:schedio_mobile/core/api.dart';
 import 'package:schedio_mobile/core/providers.dart';
 import 'package:schedio_mobile/core/widgets.dart';
@@ -21,6 +22,16 @@ Future<void> waitFor(WidgetTester tester, Finder finder) async {
 }
 
 final signIn = find.text('Sign In to Workspace');
+
+Future<void> waitForSignIn(WidgetTester tester) async {
+  await waitFor(tester, signIn);
+  final deadline = DateTime.now().add(const Duration(seconds: 30));
+  while (find.byType(AnimatedSplash).evaluate().isNotEmpty &&
+      DateTime.now().isBefore(deadline)) {
+    await tester.pump(const Duration(milliseconds: 200));
+  }
+  expect(find.byType(AnimatedSplash), findsNothing);
+}
 
 Finder field(String label) => find.descendant(
   of: find.byWidgetPredicate((w) => w is AppField && w.label == label),
@@ -69,7 +80,7 @@ void main() {
       expect(identities.every((u) => u.password.length >= 24), isTrue);
       await Api().clearToken();
       app.main();
-      await tester.pumpAndSettle();
+      await waitForSignIn(tester);
       final container = ProviderScope.containerOf(
         tester.element(find.byType(SchedioApp)),
       );
@@ -95,7 +106,7 @@ void main() {
           await api.request('admin/registration-requests');
           await openQuickAction(tester, 'My Tasks');
           await tester.tap(find.text('New Task').first);
-          await tester.pumpAndSettle();
+          await waitFor(tester, field('Title'));
           await tester.enterText(field('Title'), title);
           final save = find.text('Save');
           await tester.ensureVisible(save);
@@ -198,14 +209,13 @@ void main() {
                 .first,
             const Offset(0, 500),
           );
-          await tester.pumpAndSettle(const Duration(milliseconds: 300));
           final tile = find.ancestor(
             of: find.text(title),
             matching: find.byType(RecordTile),
           );
-          expect(
+          await waitFor(
+            tester,
             find.descendant(of: tile, matching: find.text('in progress')),
-            findsOneWidget,
           );
           await api.request(
             'tasks/$taskId/status',

@@ -8,7 +8,7 @@ import 'package:schedio_mobile/core/widgets.dart';
 import 'package:schedio_mobile/features/dashboard/home_screen.dart';
 import 'package:schedio_mobile/main.dart' as app;
 
-import 'staging_test.dart' show signIn, waitFor;
+import 'staging_test.dart' show signIn, waitFor, waitForSignIn;
 
 Future<void> waitUntil(
   WidgetTester tester,
@@ -36,7 +36,7 @@ void main() {
     );
     await Api().clearToken();
     app.main();
-    await tester.pumpAndSettle();
+    await waitForSignIn(tester);
     await tester.enterText(
       find.byType(TextFormField).at(0),
       const String.fromEnvironment('ADMIN_A_EMAIL'),
@@ -65,9 +65,21 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Open booking profile'));
     await waitFor(tester, find.text('Verified Host'));
-    await tester.ensureVisible(find.byType(DateCard).at(1));
-    await tester.tap(find.byType(DateCard).at(1));
-    await tester.pump(const Duration(milliseconds: 200));
+    await waitUntil(
+      tester,
+      () =>
+          find.byType(SlotPill).evaluate().isNotEmpty ||
+          find.text('No available slots').evaluate().isNotEmpty,
+    );
+    final tomorrow = find.byType(DateCard).at(1);
+    await tester.ensureVisible(tomorrow);
+    bool picked() => tester.widget<DateCard>(tomorrow).selected;
+    for (var i = 0; i < 5 && !picked(); i++) {
+      await tester.tap(tomorrow);
+      await tester.pump(const Duration(seconds: 1));
+      debugPrint('BOOKING tap ${i + 1}: tomorrow selected=${picked()}, slots=${find.byType(SlotPill).evaluate().length}');
+    }
+    expect(picked(), isTrue, reason: 'tapping a date card selects that day');
     await waitUntil(
       tester,
       () =>

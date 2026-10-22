@@ -65,30 +65,37 @@ class _AvailabilityScreenState extends ConsumerState<AvailabilityScreen> {
       reset();
     });
     try {
-      final data =
-          (await ref
-                  .read(apiProvider)
-                  .request(
-                    'availability/check',
-                    method: 'POST',
-                    data: {
-                      'start_time': start!.toIso8601String(),
-                      'end_time': start!.add(Duration(minutes: duration)).toIso8601String(),
-                      'room_id': room,
-                      'participant_ids': users.toList(),
-                    },
-                  ))['data']
-              as Json;
+      final data = resultOf(
+        await ref
+            .read(apiProvider)
+            .request(
+              'availability/check',
+              method: 'POST',
+              data: {
+                'start_time': start!.toIso8601String(),
+                'end_time': start!.add(Duration(minutes: duration)).toIso8601String(),
+                'room_id': room,
+                'participant_ids': users.toList(),
+              },
+            ),
+      );
+      final names = {
+        for (final u in ref.read(lookupsProvider).value?.users ?? const <Member>[]) u.id: u.name,
+      };
       if (mounted) {
         setState(() {
           conflict = data['has_conflicts'] == true;
-          people = (data['participants'] as List)
-              .map((p) => (name: '${p['name']}', status: '${p['status']}'))
-              .toList();
+          people = [
+            for (final p in (data['participants'] as List? ?? const []).whereType<Map>())
+              (
+                name: '${p['name'] ?? names[p['user_id']] ?? 'Participant ${p['user_id'] ?? ''}'}'.trim(),
+                status: '${p['status'] ?? 'unknown'}',
+              ),
+          ];
         });
       }
     } catch (e) {
-      if (mounted) setState(() => error = e.toString());
+      if (mounted) setState(() => error = friendlyError(e));
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -114,14 +121,14 @@ class _AvailabilityScreenState extends ConsumerState<AvailabilityScreen> {
           );
       if (mounted) {
         setState(() {
-          suggestions = (response['data'] as List)
+          suggestions = slotsOf(response)
               .map((s) => Slot.fromJson(s as Json))
               .toList();
           if (suggestions.isEmpty) note = 'No alternative slots on this day.';
         });
       }
     } catch (e) {
-      if (mounted) setState(() => error = e.toString());
+      if (mounted) setState(() => error = friendlyError(e));
     } finally {
       if (mounted) setState(() => busy = false);
     }

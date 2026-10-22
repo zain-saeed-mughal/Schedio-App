@@ -7,6 +7,7 @@ The Flutter app has no database, user system or scheduling engine of its own. It
 Companion documents:
 - `docs/MOBILE_API_REQUIREMENTS.md`: every endpoint, field and status code the app uses today.
 - `docs/BACKEND_DEPLOYMENT_REQUIREMENTS.md`: server, environment and acceptance-check details.
+- `docs/OFFICIAL_API_INTEGRATION_CHECKLIST.md`: the 58-endpoint matrix, decisions, sync dependencies and joint acceptance tests to confirm against your code.
 
 Repository note: the official Laravel backend is maintained by you in a separate repository. The mobile repository (`zain-saeed-mughal/Schedio-App`) also contains a Laravel **development copy** in `Schedio-main/`, which the mobile team used to build and test the app locally. It is a reference implementation of the contract below, **not** the official backend, and it may differ from what runs on `schedio.live`. Section 14 compares the two. Mobile changes are kept inside `schedio_mobile/` and these docs.
 
@@ -14,8 +15,8 @@ Repository note: the official Laravel backend is maintained by you in a separate
 
 | Environment | Base URL | Status on 2026-10-22 |
 |---|---|---|
-| Staging | `https://staging.schedio.live/api/v1/` (to be confirmed by you) | Hostname does not resolve |
-| Production | `https://schedio.live/api/v1/` (to be confirmed by you) | Laravel is up (`/up` returns 200), but every `/api/v1/*` route returns 404 |
+| Staging | `https://staging.schedio.live/api/v1/` (to be confirmed by you) | Hostname does not resolve. A staging server at `203.215.161.245` answers for this host name over plain HTTP, but it runs the mobile repository's development copy, not your official backend (see section 14) |
+| Production | `https://schedio.live/api/v1/` (confirmed in your documentation) | Live since 2026-10-22: 39 of the app's 58 routes present; 19 missing (see `OFFICIAL_API_INTEGRATION_CHECKLIST.md` section 0). Responses not yet verified with a token |
 
 Requirements: HTTPS with a public certificate, JSON on every response (including errors), and versioned routes under `/api/v1/`. The app rejects HTTP and private addresses in release builds.
 
@@ -138,7 +139,7 @@ Response: `204`. Only the owner can delete. The app calls this before `auth/logo
 - When FCM answers that a token is invalid (`UNREGISTERED`, `INVALID_ARGUMENT`), delete that token row.
 - Prevent duplicate sends for the same reminder, for example with a unique (reminder, device) send log, so retries don't notify twice.
 
-Mobile side still needed once you're ready: a Firebase project with Android `google-services.json` and iOS `GoogleService-Info.plist`, an APNs key in Firebase, and then the mobile team adds the `firebase_messaging` transport and turns on `PUSH_ENABLED`.
+Status 2026-10-22: the Firebase project `schedio-app-bc57b` exists and its Android `google-services.json` (package `live.schedio.schedio_mobile`) is in the mobile repository, git-ignored. Mobile side still needed once you're ready: the iOS `GoogleService-Info.plist`, an APNs key in Firebase, and then the mobile team adds the `firebase_messaging` transport and turns on `PUSH_ENABLED`.
 
 ## 10. Synchronization model
 
@@ -173,11 +174,11 @@ Run the 9 checks in `BACKEND_DEPLOYMENT_REQUIREMENTS.md` section 6 (JSON 404s, l
 
 | # | Item | Owner |
 |---|---|---|
-| 1 | Deploy the mobile API at the production host (`/api/v1/*` currently 404) | Backend |
+| 1 | All 58 routes now exist (route check 2026-10-22). Still needed: confirm the canonical CRM stages (v2 lists `lead`, `discovery`, `proposal`, `won`, `lost`; v1 and the website use six different stages), whether rooms accept `amenities_text`, and the real `lookups` shape | Backend |
 | 2 | Staging DNS, HTTPS and deployment, plus test accounts | Backend |
 | 3 | Confirm the official base URLs, the authentication method, and the answers in section 14 | Backend |
 | 4 | Queue worker and scheduler running on staging and production | Backend |
-| 5 | Device token endpoints and FCM sending (needed only if push is in scope for release) | Backend, then mobile |
+| 5 | Device token routes are live on production (route check only). Still needed: confirm FCM sending uses the classic FCM registration token the app sends, plus the iOS Firebase file and APNs key | Backend, then mobile |
 | 6 | Optional: send `{}` instead of `[]` for empty object fields (`metadata`, `categories`); the app already tolerates both | Backend |
 
 ## 14. Development copy versus official backend
@@ -189,15 +190,20 @@ cd schedio_mobile
 dart run tool/api_contract_check.dart https://<host>/api/v1/
 ```
 
-It probes all 54 endpoints the app uses with side-effect-free `GET` requests and no token. An existing protected route answers 401, a write-only route answers 405, and a missing route answers Laravel's "route could not be found" or an HTML 404. With `SCHEDIO_TOKEN` set to a test account's token, it also checks that the read-only collection endpoints return 200 JSON with the expected top-level fields. It never sends writes.
+It probes all 58 endpoints the app uses (54 until 2026-10-22, when `GET` and `DELETE` for `rooms/{id}` and `events/{id}` were added) with side-effect-free `GET` requests and no token. An existing protected route answers 401, a write-only route answers 405, and a missing route answers Laravel's "route could not be found" or an HTML 404. With `SCHEDIO_TOKEN` set to a test account's token, it also checks that the read-only collection endpoints return 200 JSON with the expected top-level fields. It never sends writes.
 
 Results on 2026-10-22:
 
 | Server | Routes present | Authenticated reads | Notes |
 |---|---|---|---|
-| Development copy, `http://127.0.0.1:8090/api/v1/` | 52 of 54 | 13 of 13 OK | Missing only `POST devices` and `DELETE devices/{token}` (push, not built anywhere yet) |
-| Official production, `https://schedio.live/api/v1/` | 0 of 54 | not run | Every route is a 404 (HTML for `GET`, JSON "route could not be found" for `POST`) |
+| Development copy, `http://127.0.0.1:8090/api/v1/` | 56 of 58 | 13 of 13 OK | Missing only `POST devices` and `DELETE devices/{token}` (push, not built anywhere yet) |
+| Official production, `https://schedio.live/api/v1/` | 0 of 58 | not run | Re-checked later on 2026-10-22: every route is still a JSON 404 |
+| Hosted staging server, `http://203.215.161.245/api/v1/` with `SCHEDIO_HOST=staging.schedio.live` | 56 of 58 | not run | Same result as the development copy, because that is what it runs. HTTP only until DNS and HTTPS exist |
 | Official staging, `https://staging.schedio.live/api/v1/` | not reachable | not run | Hostname does not resolve |
+
+To probe a server by IP before its DNS exists, set `SCHEDIO_HOST` to the host name; the checker then sends it as the `Host` header.
+
+**Important:** the staging server that exists today was set up from the mobile repository's development copy (`Schedio-main/`), so a pass there proves the app works with that copy on a real server. It does not prove the official backend matches. Please decide whether staging should run your official backend instead, so that web and mobile are tested against the same code that will run in production.
 
 Once official staging is up, please run the checker (or ask the mobile team to), and send the output with any intentional differences. To make the comparison complete, please answer:
 

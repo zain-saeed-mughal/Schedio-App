@@ -24,7 +24,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   List<Slot> slots = [];
   DateTime day = DateTime.now();
   int duration = 30;
-  bool busy = false;
+  bool busy = false, booking = false;
+  int request = 0;
   String? error, confirmation, calendarExport;
   Slot? chosen;
 
@@ -43,6 +44,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   }
 
   Future<void> load({bool loadProfile = false}) async {
+    final id = ++request;
     setState(() {
       busy = true;
       error = null;
@@ -54,7 +56,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       final path = 'public/booking/${Uri.encodeComponent(username.text.trim())}';
       if (loadProfile) {
         final p = BookingProfile.fromJson((await api.request(path))['data'] as Json);
-        if (!mounted) return;
+        if (!mounted || id != request) return;
         setState(() {
           profile = p;
           duration = p.durations.first;
@@ -69,13 +71,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                 },
               ))['data']
               as List;
-      if (mounted) {
+      if (mounted && id == request) {
         setState(() => slots = list.map((e) => Slot.fromJson(e as Json)).toList());
       }
     } catch (e) {
-      if (mounted) setState(() => error = e.toString());
+      if (mounted && id == request) setState(() => error = friendlyError(e));
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted && id == request) setState(() => busy = false);
     }
   }
 
@@ -83,6 +85,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     if (!form.currentState!.validate() || chosen == null) return;
     setState(() {
       busy = true;
+      booking = true;
       error = null;
     });
     try {
@@ -109,12 +112,17 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          error = e.toString();
+          error = friendlyError(e);
           chosen = null;
         });
       }
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted) {
+        setState(() {
+          busy = false;
+          booking = false;
+        });
+      }
     }
   }
 
@@ -137,6 +145,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     subtitle: 'Public booking page',
     dim: true,
     body: ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: pageInsets(context),
       children: [
         if (confirmation != null) confirmed() else ...[
@@ -308,7 +317,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 64,
+            height: context.textHeight(64, 32),
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: 14,
@@ -321,7 +330,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   today: i == 0,
                   selected: d.year == day.year && d.month == day.month && d.day == day.day,
                   onTap: () {
-                    if (busy) return;
+                    if (booking) return;
                     setState(() => day = d);
                     load();
                   },

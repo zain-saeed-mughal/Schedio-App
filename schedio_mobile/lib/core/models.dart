@@ -3,6 +3,13 @@ typedef Json = Map<String, dynamic>;
 Json? asMap(Object? value) =>
     value is Map ? value.map((k, v) => MapEntry('$k', v)) : null;
 
+Json resultOf(Json response) => asMap(response['data']) ?? response;
+
+List slotsOf(Json response) {
+  final list = response['data'] ?? response['slots'];
+  return list is List ? list : const [];
+}
+
 class Member {
   final int id;
   final String name;
@@ -138,10 +145,12 @@ class Record {
       progress = j['progress'] as String?,
       notes = j['notes'] as String?,
       dealValue = j['deal_value']?.toString(),
-      agenda = j['agenda'] as String?,
-      discussion = j['discussion'] as String?,
+      agenda = (j['agenda'] ?? j['title']) as String?,
+      discussion = (j['discussion'] ?? j['content']) as String?,
       decisions = j['decisions'] as String?,
-      actionItems = j['action_items'] as String?,
+      actionItems = j['action_items'] is List
+          ? (j['action_items'] as List).join('\n')
+          : j['action_items'] as String?,
       code = j['code'] as String?,
       role = j['role'] as String?,
       email = j['email'] as String?,
@@ -199,6 +208,13 @@ class RecordPage {
 class Dashboard {
   final int today, upcoming, tasks, unread;
   final List<Record> meetings;
+  const Dashboard({
+    required this.today,
+    required this.upcoming,
+    required this.tasks,
+    required this.unread,
+    required this.meetings,
+  });
   Dashboard.fromJson(Json j)
     : today = j['today_meetings'] as int,
       upcoming = j['upcoming_meetings'] as int,
@@ -207,17 +223,49 @@ class Dashboard {
       meetings = (j['meetings'] as List)
           .map((e) => Record.fromJson(e as Json, Module.meetings))
           .toList();
+
+  factory Dashboard.parse(Json response) {
+    final j = resultOf(response);
+    final metrics = asMap(j['metrics']);
+    if (metrics == null) return Dashboard.fromJson(j);
+    int count(Object? v) => v is int ? v : int.tryParse('$v') ?? 0;
+    List<Json> rows(Object? v) => [
+      for (final item in v is List ? v : const [])
+        if (asMap(item) case final Json m) m,
+    ];
+    final seen = <Object?>{};
+    return Dashboard(
+      today: count(metrics['today_meetings_count'] ?? metrics['today_meetings']),
+      upcoming: count(metrics['upcoming_meetings']),
+      tasks: count(metrics['pending_tasks']),
+      unread: count(metrics['unread_notifications']),
+      meetings: [
+        for (final m in [...rows(j['today_meetings']), ...rows(j['upcoming_meetings'])])
+          if (seen.add(m['id'])) Record.fromJson(m, Module.meetings),
+      ].take(8).toList(),
+    );
+  }
 }
 
 class Lookups {
   final List<Member> users, departments, rooms, clients;
+  final List<String> taskStatuses;
+  final bool hasClients;
   Lookups.fromJson(Json j)
     : users = _members(j['users']),
       departments = _members(j['departments']),
       rooms = _members(j['rooms']),
-      clients = _members(j['clients']);
-  static List<Member> _members(dynamic j) =>
-      (j as List).map((e) => Member.fromJson(e as Json)).toList();
+      clients = _members(j['clients']),
+      hasClients = j['clients'] is List,
+      taskStatuses = [
+        for (final s in j['task_statuses'] is List ? j['task_statuses'] as List : const [])
+          if (s is String) s else if (asMap(s)?['key'] case final String key) key,
+      ];
+  static List<Member> _members(dynamic j) => [
+    for (final e in j is List ? j : const [])
+      if (asMap(e) case final Json m when m['id'] is int && (m['name'] ?? m['company_name']) is String)
+        Member.fromJson(m),
+  ];
 }
 
 class CalendarEntry {

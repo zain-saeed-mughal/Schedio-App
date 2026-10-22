@@ -28,6 +28,7 @@ void main() {
       debugPrint('CHECK restart keeps session PASS');
       return;
     }
+    await waitFor(tester, signIn);
     await tester.enterText(
       find.byType(TextFormField).at(0),
       const String.fromEnvironment('ADMIN_A_EMAIL'),

@@ -12,7 +12,7 @@ import 'package:schedio_mobile/features/workspace/approval_screen.dart';
 import 'package:schedio_mobile/features/workspace/registration_queue.dart';
 import 'package:schedio_mobile/main.dart' as app;
 
-import 'staging_test.dart' show field, pickerTile, signIn, waitFor;
+import 'staging_test.dart' show field, pickerTile, signIn, waitFor, waitForSignIn;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -28,7 +28,7 @@ void main() {
       );
       await Api().clearToken();
       app.main();
-      await tester.pumpAndSettle();
+      await waitForSignIn(tester);
       await tester.enterText(
         find.byType(TextFormField).at(0),
         const String.fromEnvironment('ADMIN_A_EMAIL'),
@@ -147,17 +147,47 @@ void main() {
           meeting['metadata']['client_email'],
           'mobile.guest@example.test',
         );
+        final stamp = DateTime.now().millisecondsSinceEpoch;
+        final applicantName = 'Mobile Applicant $stamp';
+        final applicantEmail = 'mobile.applicant.$stamp@example.test';
+        final applicantPassword = 'Applicant-$stamp-${stamp.hashCode}Aa!';
+        final me = (await api.request('auth/me'))['data'] as Map;
+        await api.request(
+          'auth/register',
+          method: 'POST',
+          data: {
+            'name': applicantName,
+            'email': applicantEmail,
+            'password': applicantPassword,
+            'password_confirmation': applicantPassword,
+            'registration_type': 'employee',
+            'company_id': (me['company'] as Map)['id'],
+          },
+        );
+        final pending = await api.request(
+          'admin/registration-requests',
+          query: {'status': 'pending'},
+        );
+        final requestId = (pending['data'] as List).singleWhere(
+          (x) => x['email'] == applicantEmail,
+        )['id'];
+        final options = await api.request(
+          'admin/registration-requests/$requestId/options',
+        );
+        final departments = options['departments'] as List;
         await tap(find.byType(CenterFab));
         await tap(find.text('Registration Queue'));
-        final card = find.widgetWithText(RequestCard, 'EMPLOYEE A');
+        final card = find.widgetWithText(RequestCard, applicantName);
         await waitFor(tester, card);
         await tap(find.descendant(of: card, matching: find.text('Approve')));
         await waitFor(tester, find.byType(ApprovalScreen));
         await waitFor(tester, find.byType(DropdownButtonFormField<String>));
         await tap(find.byType(DropdownButtonFormField<String>));
         await tap(find.text('Manager').last);
-        await tap(find.byType(DropdownButtonFormField<int>));
-        await tap(find.text('Mobile Acceptance Department').last);
+        if (departments.isNotEmpty) {
+          await tap(find.byType(DropdownButtonFormField<int>));
+          await tap(find.text('${departments.first['name']}').last);
+        }
         await tester.enterText(find.byType(TextField).last, 'Mobile team lead');
         await tap(find.text('Confirm approval'));
         final approvalDeadline = DateTime.now().add(
@@ -173,11 +203,13 @@ void main() {
           query: {'status': 'approved'},
         );
         final person = (approved['data'] as List).singleWhere(
-          (x) => x['email'] == const String.fromEnvironment('EMPLOYEE_A_EMAIL'),
+          (x) => x['email'] == applicantEmail,
         );
         expect(person['role'], 'manager');
         expect(person['title'], 'Mobile team lead');
-        expect(person['department_id'], isNotNull);
+        if (departments.isNotEmpty) {
+          expect(person['department_id'], departments.first['id']);
+        }
       } finally {
         final found = await api.request('meetings', query: {'search': marker});
         for (final record in found['data'] as List) {
