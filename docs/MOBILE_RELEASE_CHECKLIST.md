@@ -268,3 +268,67 @@ Diagnosis on the phone: Schedio had no notification channels at all (not even Fi
 | `release-builds/Schedio-1.0.0-production-20261023.aab` (58.1 MB) | Release, `APP_ENV=production`, push off | same key |
 
 Both: no development addresses, cleartext traffic off, `POST_NOTIFICATIONS` declared. `release-builds/` is excluded from git through `.git/info/exclude`. APK SHA-256: `54e1a6fff53fa864ce5a3cbeefae283a18d904b5710b5fff4b58769a5eadcb08`.
+
+### Bug fixes and push rerun (2026-10-23, evening)
+
+Full details: `docs/MOBILE_QA_REPORT.md`.
+
+| Check | Result | Evidence |
+|---|---|---|
+| Pipeline Board and Spreadsheet (Map-to-int cast) | VERIFIED PASS | Phone bug checks on production |
+| Settings push status and Save preferences | VERIFIED PASS | "Push notifications: On for this device"; "Notification preferences saved." |
+| Public booking slots (no "could not read") | VERIFIED PASS | Today genuinely empty, tomorrow shows slots |
+| Foreground push | VERIFIED PASS | Received by the app; one tray notification |
+| Background push | VERIFIED PASS | Tray notification on `schedio_high_importance_channel`, importance 4; seen by the user |
+| Notification tap | VERIFIED PASS | After adding the `FLUTTER_NOTIFICATION_CLICK` intent filter: opened the app and routed to the inbox |
+| Terminated push | NOT TESTED | Needs the backend CLI trigger after the app is closed |
+| `flutter analyze` / `flutter test` | PASS | Clean / 141 passing |
+| Production route check | PASS | 58 of 58 routes present |
+
+### Release artifacts r2 (2026-10-23, evening; includes all fixes above)
+
+| File | Build | SHA-256 |
+|---|---|---|
+| `release-builds/Schedio-1.0.0-production-push-20261023-r2.apk` (59.6 MB) | Release, `APP_ENV=production`, `PUSH_ENABLED=true` | `ee5555ca8c6fbbc77f41107cf3656bd420cc6e3ba6b18c21a6fd9eadfb8065e8` |
+| `release-builds/Schedio-1.0.0-production-push-20261023-r2.aab` (58.2 MB) | Release, `APP_ENV=production`, `PUSH_ENABLED=true` | `97cc633d99bd14790864c41cbbe4e2a4d96d9b15e90b6539b79e2a41cb76b941` |
+
+Verified: both signed with the upload key `807f482b...e0e181`; manifest has the `FLUTTER_NOTIFICATION_CLICK` filter, the default channel, `POST_NOTIFICATIONS` and cleartext off; `ic_stat_schedio` kept; no development addresses in the compiled code (only `schedio.live/api/v1`). Checksums also in `release-builds/SHA256SUMS-20261023-r2.txt`. The earlier artifacts are kept unchanged. Not yet installed on the phone: replacing the debug build signs the tester out.
+
+### Release build push fix and artifacts r3 (2026-10-23, night; supersedes r2)
+
+On the installed r2 release build Settings showed "Device alerts" and push never registered. Cause: Google Play services on the phone refused the first token request (`SERVICE_NOT_AVAILABLE`, captured with a temporary native log; not code shrinking and not the Firebase key, both ruled out by test), and the app then gave up for the whole session. Fixes in `lib/core/push.dart`, `lib/app/shell.dart`, `lib/features/settings/settings_screen.dart`:
+
+- Push keeps its listeners when the first token request fails, retries after 20 s, 1, 5 and 15 minutes, and again whenever Schedio returns to the foreground; a token refresh from Firebase also registers.
+- Settings on push builds shows the real state ("On for this device", "Setting up", or "Off, allow notifications"), not the Device alerts switch.
+- Push setup and registration failures are always written to the device log (error type and message only, no tokens).
+- Tests: 3 new push tests and 2 new Settings tests; 145 passing, analyzer clean.
+
+After installing over r2 (same key, session kept), Firebase logged "Token successfully retrieved" with no registration error, and Settings shows "Push notifications: On for this device" (VERIFIED PASS: server registration). Delivery on r3 still needs the backend test push.
+
+| File | SHA-256 |
+|---|---|
+| `release-builds/Schedio-1.0.0-production-push-20261023-r3.apk` (59.6 MB) | `16cc4a64f132526c4af2cbb24b03ec596e509cecc3a74b47fe74173f78c25b18` |
+| `release-builds/Schedio-1.0.0-production-push-20261023-r3.aab` (58.2 MB) | `48f41051240726359d1970dce3f4dbedc42f89eb65c53df6b28cccee0d2c9586` |
+
+Both release builds with `APP_ENV=production` and `PUSH_ENABLED=true`, signed with the upload key `807f482b...e0e181`, no development addresses. Checksums also in `release-builds/SHA256SUMS-20261023-r3.txt`. r3 is installed on the phone.
+
+### Artifacts r4 (2026-10-23, night; supersedes r3)
+
+Adds the timezone and task assignee fixes (see `MOBILE_QA_REPORT.md` section G). Analyzer clean, 149 tests passing, phone bug checks all PASS.
+
+| File | SHA-256 |
+|---|---|
+| `release-builds/Schedio-1.0.0-production-push-20261023-r4.apk` | `bb2c33d27667a5c0a0c9936aaa240489a0dbf2a80f8a88ec9a6107908cb991bb` |
+| `release-builds/Schedio-1.0.0-production-push-20261023-r4.aab` | `22021de2dd2e9f228d252da76399947c658f32baafca741b60825f834ef6f32f` |
+
+Upload key `807f482b...e0e181`, no development addresses. r4 is installed on the phone and opens signed in.
+
+
+### Final release r6 (2026-10-24)
+
+See `docs/handover/RELEASE_MANIFEST.md` (r6 APK/AAB, checksums) and `docs/handover/FINAL_QA_REPORT.md`.
+
+
+### Final release r7 (2026-10-24)
+
+API v2.1 verified on production; see `docs/handover/` (r7 APK/AAB, checksums, final QA report).

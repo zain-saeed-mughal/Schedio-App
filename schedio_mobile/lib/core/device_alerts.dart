@@ -76,7 +76,7 @@ class DeviceAlerts {
       final key = 'device_alert_watermark_${account.id}';
       final previous = DateTime.tryParse(prefs.getString(key) ?? '');
       final response = await api.request('notifications');
-      final records = response['data'] as List;
+      final records = response['data'] is List ? response['data'] as List : const [];
       DateTime? newest;
       var hasNewUnread = false;
       for (final raw in records) {

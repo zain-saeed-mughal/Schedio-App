@@ -6,8 +6,9 @@ import '../../core/providers.dart';
 import '../../core/widgets.dart';
 
 final approvalOptionsProvider = FutureProvider.autoDispose.family<Json, String>(
-  (ref, id) =>
-      ref.watch(apiProvider).request('admin/registration-requests/$id/options'),
+  (ref, id) async => resultOf(
+    await ref.watch(apiProvider).request('admin/registration-requests/$id/options'),
+  ),
 );
 
 class ApprovalScreen extends ConsumerStatefulWidget {
@@ -124,8 +125,12 @@ class _ApprovalScreenState extends ConsumerState<ApprovalScreen> {
                         value: null,
                         child: Text('Keep ${titleCase(a.role ?? 'employee')}'),
                       ),
-                      for (final value in (options['roles'] as List).cast<String>())
-                        DropdownMenuItem(value: value, child: Text(titleCase(value))),
+                      for (final r in options['roles'] is List ? options['roles'] as List : const [])
+                        if ((r is String ? r : asMap(r)?['key'] as String?) case final String value)
+                          DropdownMenuItem(
+                            value: value,
+                            child: Text(r is Map && r['label'] is String ? r['label'] as String : titleCase(value)),
+                          ),
                     ],
                     onChanged: busy ? null : (v) => role = v,
                   ),
@@ -137,11 +142,12 @@ class _ApprovalScreenState extends ConsumerState<ApprovalScreen> {
                         value: null,
                         child: Text('Keep current department'),
                       ),
-                      for (final item in options['departments'] as List)
-                        DropdownMenuItem(
-                          value: item['id'] as int,
-                          child: Text(item['name'] as String),
-                        ),
+                      for (final item in options['departments'] is List ? options['departments'] as List : const [])
+                        if (asInt(item) case final int id)
+                          DropdownMenuItem(
+                            value: id,
+                            child: Text(nameOf(item) ?? 'Department $id'),
+                          ),
                     ],
                     onChanged: busy ? null : (v) => department = v,
                   ),

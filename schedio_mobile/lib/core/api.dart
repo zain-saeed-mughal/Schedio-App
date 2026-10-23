@@ -133,7 +133,7 @@ class Api {
       422 => server ?? 'Some details need attention. Check the form and try again.',
       429 => 'Too many attempts. Please wait a minute and try again.',
       >= 500 => 'The Schedio server had a problem. Please try again shortly.',
-      _ => server ?? 'Something went wrong. Please try again.',
+      _ => server ?? 'Something went wrong (HTTP $status). Please try again.',
     };
   }
   Future<Json> request(
@@ -192,10 +192,26 @@ class Repository {
       Account.fromJson((await api.request('auth/me'))['data'] as Json);
   Future<Dashboard> dashboard() async {
     try {
-      return Dashboard.parse(await api.request('dashboard'));
+      final inboxCount = inboxUnread(); // never throws
+      final parsed = Dashboard.parse(await api.request('dashboard'));
+      // The badge must match the inbox; the dashboard metric can count other
+      // items (production reported 11 while the inbox held none).
+      final inbox = await inboxCount;
+      return inbox == null ? parsed : parsed.withUnread(inbox);
     } on ApiFailure catch (e) {
       if (!e.unsupported) rethrow;
       return composedDashboard();
+    }
+  }
+
+  /// Unread count as the notifications inbox reports it, or null if unavailable.
+  Future<int?> inboxUnread() async {
+    try {
+      final r = await api.request('notifications', query: {'filter': 'unread', 'status': 'unread', 'per_page': 1});
+      final meta = asMap(r['meta']);
+      return asInt(meta?['unread_count'] ?? meta?['total']);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -218,8 +234,8 @@ class Repository {
       api.request(
         'calendar/feed',
         query: {
-          'start': dayStart.toUtc().toIso8601String(),
-          'end': dayStart.add(const Duration(days: 30)).toUtc().toIso8601String(),
+          'start': isoWithOffset(dayStart),
+          'end': isoWithOffset(dayStart.add(const Duration(days: 30))),
           'type': 'meetings',
         },
       ),
@@ -314,15 +330,15 @@ class Repository {
     module,
   );
   Future<Record> detail(Module module, String id) async => Record.fromJson(
-    (await api.request('${module.path}/$id'))['data'] as Json,
+    resultOf(await api.request('${module.path}/$id')),
     module,
   );
   Future<List<CalendarEntry>> calendar(DateTime start, DateTime end) async =>
       ((await api.request(
                 'calendar/feed',
                 query: {
-                  'start': start.toUtc().toIso8601String(),
-                  'end': end.toUtc().toIso8601String(),
+                  'start': isoWithOffset(start.toLocal()),
+                  'end': isoWithOffset(end.toLocal()),
                 },
               ))['data']
               as List)

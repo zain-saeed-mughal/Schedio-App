@@ -72,8 +72,8 @@ class _AvailabilityScreenState extends ConsumerState<AvailabilityScreen> {
               'availability/check',
               method: 'POST',
               data: {
-                'start_time': start!.toIso8601String(),
-                'end_time': start!.add(Duration(minutes: duration)).toIso8601String(),
+                'start_time': isoWithOffset(start!),
+                'end_time': isoWithOffset(start!.add(Duration(minutes: duration))),
                 'room_id': room,
                 'participant_ids': users.toList(),
               },

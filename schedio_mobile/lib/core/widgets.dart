@@ -576,3 +576,8 @@ class _NotificationRow extends StatelessWidget {
     );
   }
 }
+
+/// A time for the API: wall-clock time in [timezone] with its UTC offset,
+/// e.g. 2026-12-20T15:00:00+05:00. The Schedio server stores the wall-clock
+/// part, so sending UTC ("...Z") would shift times by the zone offset.
+String apiTime(DateTime value, String timezone) => isoWithOffset(localIn(value, timezone));

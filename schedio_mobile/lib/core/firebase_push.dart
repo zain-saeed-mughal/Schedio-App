@@ -11,6 +11,15 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'device_alerts.dart';
 import 'push.dart';
 
+@pragma('vm:entry-point')
+Future<void> schedioBackgroundMessage(RemoteMessage message) async {
+  if (message.notification != null) return;
+  await Firebase.initializeApp();
+  final local = FlutterLocalNotificationsPlugin();
+  await initializeLocalNotifications(local);
+  await FirebasePushTransport.present(local, FirebasePushTransport.toMessage(message));
+}
+
 class FirebasePushTransport implements PushTransport {
   final FirebaseMessaging messaging;
   final FlutterLocalNotificationsPlugin local;
@@ -25,6 +34,8 @@ class FirebasePushTransport implements PushTransport {
     if (!PushService.enabledByBuild) return null;
     try {
       await Firebase.initializeApp();
+      FirebaseMessaging.onBackgroundMessage(schedioBackgroundMessage);
+      await FirebaseMessaging.instance.setAutoInitEnabled(true);
       final local = FlutterLocalNotificationsPlugin();
       await initializeLocalNotifications(local);
       await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
@@ -33,8 +44,8 @@ class FirebasePushTransport implements PushTransport {
         sound: true,
       );
       return FirebasePushTransport(FirebaseMessaging.instance, local);
-    } catch (e) {
-      if (kDebugMode) debugPrint('Push disabled: Firebase could not start ($e)');
+    } catch (e, stack) {
+      debugPrint('Schedio push disabled: setup failed (${e.runtimeType}: $e)\n$stack');
       return null;
     }
   }
@@ -99,7 +110,9 @@ class FirebasePushTransport implements PushTransport {
   Future<void> deleteToken() => messaging.deleteToken();
 
   @override
-  Future<void> showForeground(PushMessage message) async {
+  Future<void> showForeground(PushMessage message) => present(local, message);
+
+  static Future<void> present(FlutterLocalNotificationsPlugin local, PushMessage message) async {
     if (defaultTargetPlatform != TargetPlatform.android) return;
     if (message.title == null && message.body == null) return;
     await local.show(

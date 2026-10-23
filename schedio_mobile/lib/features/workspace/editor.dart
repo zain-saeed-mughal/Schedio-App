@@ -416,15 +416,15 @@ class _EditorState extends ConsumerState<Editor> {
       payload['timezone'] = zone;
     }
     if ([Module.meetings, Module.events].contains(m)) {
-      payload['start_time'] = start!.toUtc().toIso8601String();
-      payload['end_time'] = end!.toUtc().toIso8601String();
+      payload['start_time'] = apiTime(start!, zone);
+      payload['end_time'] = apiTime(end!, zone);
     }
     if (m == Module.tasks) {
-      payload['due_date'] = due?.toUtc().toIso8601String();
-      payload['meeting_id'] = widget.meetingId;
+      payload['due_date'] = due == null ? null : apiTime(due!, zone);
+      payload['meeting_id'] = widget.meetingId ?? widget.record?.meetingId;
     }
     if (m == Module.notes) {
-      payload['follow_up_date'] = due?.toUtc().toIso8601String();
+      payload['follow_up_date'] = due == null ? null : apiTime(due!, zone);
     }
     var path = m.path;
     if (widget.record != null) {

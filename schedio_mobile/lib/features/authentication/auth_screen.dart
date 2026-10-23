@@ -68,15 +68,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         companies = (j['companies'] as List? ?? const [])
             .map((e) => Member.fromJson(e as Json))
             .toList();
-        departments = (j['departments'] as List? ?? const [])
-            .map(
-              (e) => (
-                id: e['id'] as int,
-                companyId: e['company_id'] as int,
-                name: e['name'] as String,
-              ),
-            )
-            .toList();
+        departments = [
+          for (final e in j['departments'] as List? ?? const [])
+            if ((asInt(e), asInt(asMap(e)?['company_id'])) case (final int id, final int companyId))
+              (id: id, companyId: companyId, name: nameOf(e) ?? 'Department $id'),
+        ];
       });
     } catch (e) {
       if (mounted) setState(() => error = friendlyError(e));

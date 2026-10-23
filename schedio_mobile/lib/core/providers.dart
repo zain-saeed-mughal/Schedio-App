@@ -140,7 +140,9 @@ final dashboardProvider = FutureProvider((ref) async {
   final repository = ref.watch(repositoryProvider);
   final alerts = ref.read(deviceAlertsProvider);
   final dashboard = await repository.dashboard();
-  if (account != null) {
+  final push = ref.read(pushServiceProvider);
+  final pushActive = push.enabled && push.registeredToken != null;
+  if (account != null && !pushActive) {
     unawaited(
       alerts
           .sync(repository.api, account)

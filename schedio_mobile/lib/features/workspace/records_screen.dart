@@ -459,7 +459,9 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
         retry: () => ref.invalidate(provider),
         builder: (r) {
           final zone = ref.watch(authProvider).value?.timezone ?? 'UTC';
-          final me = ref.watch(authProvider).value?.id;
+          final account = ref.watch(authProvider).value;
+          final me = account?.id;
+          final manage = r.canManageAs(account);
           final path = '${r.module.path}/${r.id}';
           final mine = r.participants.where((p) => p.id == me).firstOrNull;
           final currentRsvp = rsvp ?? mine?.status;
@@ -622,7 +624,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                   Record.fromJson({'id': r.meetingId, 'title': 'Meeting'}, Module.meetings),
                 ),
               ),
-            if ([Module.clients, Module.tasks].contains(r.module) && r.canManage)
+            if ([Module.clients, Module.tasks].contains(r.module) && manage)
               GlassCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -681,18 +683,18 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                   ],
                 ],
               ),
-            if (r.canManage &&
-                ![Module.tasks, Module.administration, Module.notifications].contains(r.module))
+            if (manage &&
+                ![Module.administration, Module.notifications].contains(r.module))
               AppButton(
                 label: 'Edit',
                 icon: Icons.edit_outlined,
                 expand: true,
                 onPressed: busy ? null : () => openEditor(context, r.module, record: r),
               ),
-            if ((r.canManage && r.module != Module.tasks) || r.module == Module.notifications)
+            if ((manage && r.module != Module.administration) || r.module == Module.notifications)
               Row(
                 children: [
-                  if (r.canManage && r.module == Module.meetings && r.status != 'cancelled') ...[
+                  if (manage && r.module == Module.meetings && r.status != 'cancelled') ...[
                     Expanded(
                       child: AppButton(
                         label: 'Cancel meeting',

@@ -23,7 +23,15 @@ class FakeTransport implements PushTransport {
   @override
   Future<bool> requestPermission() async => granted;
   @override
-  Future<String?> token() async => 'token-1';
+  Future<String?> token() async {
+    if (tokenFailures > 0) {
+      tokenFailures--;
+      throw Exception('SERVICE_NOT_AVAILABLE');
+    }
+    return 'token-1';
+  }
+
+  var tokenFailures = 0;
   @override
   Stream<String> get onTokenRefresh => refresh.stream;
   @override
@@ -95,6 +103,36 @@ void main() {
     transport.refresh.add('token-3');
     await settle();
     expect(push.registeredToken, 'token-3');
+  });
+
+  test('a failed token request keeps retrying, then registers and reports push as active', () async {
+    final transport = FakeTransport()..tokenFailures = 2;
+    final push = PushService(api, transport, enabled: true, retryDelays: const [Duration(milliseconds: 10)]);
+    await push.start();
+    expect(push.status.value, PushStatus.connecting);
+    expect(push.registeredToken, isNull);
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(push.registeredToken, 'token-1');
+    expect(push.status.value, PushStatus.active);
+    expect(requests.where((r) => r.path.endsWith('devices')), hasLength(1));
+  });
+
+  test('push keeps listening for a token refresh after the first token request fails', () async {
+    final transport = FakeTransport()..tokenFailures = 1;
+    final push = PushService(api, transport, enabled: true, retryDelays: const [Duration(hours: 1)]);
+    await push.start();
+    expect(push.status.value, PushStatus.connecting);
+    transport.refresh.add('token-2');
+    await settle();
+    expect(push.registeredToken, 'token-2');
+    expect(push.status.value, PushStatus.active);
+    await push.stopListening();
+  });
+
+  test('push reports blocked when notifications are not allowed', () async {
+    final push = PushService(api, FakeTransport()..granted = false, enabled: true);
+    await push.start();
+    expect(push.status.value, PushStatus.blocked);
   });
 
   test('foreground duplicates are shown once and taps are routed', () async {

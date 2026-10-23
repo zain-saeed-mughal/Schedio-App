@@ -5,6 +5,20 @@ Json? asMap(Object? value) =>
 
 Json resultOf(Json response) => asMap(response['data']) ?? response;
 
+int? asInt(Object? value) => switch (value) {
+  int v => v,
+  num v => v.toInt(),
+  String v => int.tryParse(v.trim()),
+  Map v => asInt(v['id']),
+  _ => null,
+};
+
+String? nameOf(Object? value) => switch (value) {
+  String v when v.isNotEmpty => v,
+  Map v => (v['name'] ?? v['company_name'] ?? v['title']) as String?,
+  _ => null,
+};
+
 List slotsOf(Json response) {
   final list = response['data'] ?? response['slots'];
   return list is List ? list : const [];
@@ -16,8 +30,8 @@ class Member {
   final String? status;
   const Member(this.id, this.name, [this.status]);
   factory Member.fromJson(Json j) => Member(
-    j['id'] as int,
-    (j['name'] ?? j['company_name']) as String,
+    asInt(j['id']) ?? 0,
+    (j['name'] ?? j['company_name'] ?? '') as String,
     j['status'] as String?,
   );
 }
@@ -29,13 +43,15 @@ class Account {
   final bool canAdminister, canManageRooms;
   final NotificationPreferences preferences;
   Account.fromJson(Json j)
-    : id = j['id'] as int,
-      name = j['name'] as String,
-      email = j['email'] as String,
-      role = j['role'] as String,
-      timezone = j['timezone'] as String? ?? 'UTC',
-      bookingUrl = j['booking_url'] as String,
-      bookingUsername = j['booking_username'] as String,
+    : id = asInt(j['id']) ?? 0,
+      name = '${j['name'] ?? ''}',
+      email = '${j['email'] ?? ''}',
+      role = '${j['role'] ?? ''}',
+      timezone = j['timezone'] is String && (j['timezone'] as String).isNotEmpty
+          ? j['timezone'] as String
+          : 'UTC',
+      bookingUrl = j['booking_url'] as String? ?? '',
+      bookingUsername = '${j['booking_username'] ?? j['username'] ?? ''}',
       title = j['title'] as String?,
       phone = j['phone'] as String?,
       company = asMap(j['company'])?['name'] as String?,
@@ -102,7 +118,22 @@ class Record {
   final List<String> amenities;
   final List<String> attachments;
   final String? owner;
+  /// Whether the server said the user may manage this record (null: not sent).
+  final bool? serverCanManage;
+  /// Creator, owner or organiser id, used when the server does not send can_manage.
+  final int? creatorId;
   final Module module;
+  /// Whether [account] may edit this record. The server's `can_manage` wins
+  /// when it is sent; tasks, clients and events currently omit it, so fall
+  /// back to the account's role and ownership (the server still enforces it).
+  bool canManageAs(Account? account) {
+    if (serverCanManage != null) return serverCanManage!;
+    if (account == null) return false;
+    if (account.canAdminister) return true;
+    if (module == Module.rooms) return account.canManageRooms;
+    return account.id != 0 && (creatorId == account.id || assignedTo == account.id);
+  }
+
   Record.fromJson(Json j, this.module)
     : id = '${j['id']}',
       title =
@@ -125,6 +156,8 @@ class Record {
       due = _date(j['due_date'] ?? j['follow_up_date']),
       created = _date(j['created_at']),
       canManage = j['can_manage'] == true,
+      serverCanManage = j['can_manage'] is bool ? j['can_manage'] as bool : null,
+      creatorId = asInt(j['creator'] ?? j['created_by'] ?? j['user'] ?? j['organizer'] ?? j['author'] ?? j['user_id']),
       canRsvp = j['can_rsvp'] == true,
       isPrivate = j['is_private'] == true,
       isActive = j['is_active'] != false,
@@ -159,27 +192,26 @@ class Record {
       clientName = asMap(j['metadata'])?['client_name'] as String?,
       clientEmail = asMap(j['metadata'])?['client_email'] as String?,
       clientCompany = asMap(j['metadata'])?['client_company'] as String?,
-      roomId = j['room_id'] as int?,
-      departmentId = j['department_id'] as int?,
-      clientId = j['client_id'] as int?,
-      assignedTo = j['assigned_to'] as int?,
-      meetingId =
-          j['meeting_id'] as int? ??
-          asMap(j['data'])?['meeting_id'] as int?,
-      capacity = j['capacity'] as int?,
+      roomId = asInt(j['room_id'] ?? j['room']),
+      departmentId = asInt(j['department_id'] ?? j['department']),
+      clientId = asInt(j['client_id'] ?? j['client']),
+      assignedTo = asInt(j['assigned_to'] ?? j['assignee']),
+      meetingId = asInt(j['meeting_id']) ?? asInt(asMap(j['data'])?['meeting_id']),
+      capacity = asInt(j['capacity']),
       participants = (j['participants'] as List? ?? [])
           .map((e) => Member.fromJson(e as Json))
           .toList(),
-      amenities = (j['amenities'] as List? ?? []).cast<String>(),
-      attachments = (j['attachments'] as List? ?? [])
-          .map(
-            (a) =>
-                ((a as Json)['text'] ?? a['url'] ?? a['name'] ?? '').toString(),
-          )
-          .toList(),
+      amenities = [
+        for (final a in j['amenities'] is List ? j['amenities'] as List : const [])
+          if (a is String ? a : nameOf(a) case final String text) text,
+      ],
+      attachments = [
+        for (final a in j['attachments'] is List ? j['attachments'] as List : const [])
+          if (a is String) a else if (asMap(a) case final Json m) '${m['text'] ?? m['url'] ?? m['name'] ?? ''}',
+      ],
       owner =
           asMap(
-                j['organizer'] ?? j['assignee'] ?? j['assignedTo'] ?? j['author'],
+                j['organizer'] ?? j['assignee'] ?? j['assignedTo'] ?? j['assigned_to'] ?? j['author'],
               )?['name']
               as String?;
   static DateTime? _date(dynamic v) =>
@@ -193,16 +225,9 @@ class RecordPage {
     : records = (j['data'] as List)
           .map((e) => Record.fromJson(e as Json, module))
           .toList(),
-      page =
-          (asMap(j['meta'])?['current_page'] ?? j['current_page'] ?? 1)
-              as int,
-      lastPage =
-          (asMap(j['meta'])?['last_page'] ?? j['last_page'] ?? 1) as int,
-      total =
-          (asMap(j['meta'])?['total'] ??
-                  j['total'] ??
-                  (j['data'] as List).length)
-              as int;
+      page = asInt(asMap(j['meta'])?['current_page'] ?? j['current_page']) ?? 1,
+      lastPage = asInt(asMap(j['meta'])?['last_page'] ?? j['last_page']) ?? 1,
+      total = asInt(asMap(j['meta'])?['total'] ?? j['total']) ?? (j['data'] as List).length;
 }
 
 class Dashboard {
@@ -216,13 +241,17 @@ class Dashboard {
     required this.meetings,
   });
   Dashboard.fromJson(Json j)
-    : today = j['today_meetings'] as int,
-      upcoming = j['upcoming_meetings'] as int,
-      tasks = j['pending_tasks'] as int,
-      unread = j['unread_notifications'] as int,
-      meetings = (j['meetings'] as List)
-          .map((e) => Record.fromJson(e as Json, Module.meetings))
-          .toList();
+    : today = asInt(j['today_meetings']) ?? 0,
+      upcoming = asInt(j['upcoming_meetings']) ?? 0,
+      tasks = asInt(j['pending_tasks']) ?? 0,
+      unread = asInt(j['unread_notifications']) ?? 0,
+      meetings = [
+        for (final e in j['meetings'] is List ? j['meetings'] as List : const [])
+          if (asMap(e) case final Json m) Record.fromJson(m, Module.meetings),
+      ];
+
+  Dashboard withUnread(int value) =>
+      Dashboard(today: today, upcoming: upcoming, tasks: tasks, unread: value, meetings: meetings);
 
   factory Dashboard.parse(Json response) {
     final j = resultOf(response);
@@ -273,22 +302,37 @@ class CalendarEntry {
   final Module module;
   final DateTime start, end;
   CalendarEntry.fromJson(Json j)
-    : title = j['title'] as String,
+    : title = '${j['title'] ?? 'Untitled'}',
       id = '${j['id']}',
       module = j['entity_type'] == 'meeting' ? Module.meetings : Module.events,
       start = DateTime.parse(j['start_time'] as String),
-      end = DateTime.parse(j['end_time'] as String);
+      end =
+          DateTime.tryParse('${j['end_time']}') ??
+          DateTime.parse(j['start_time'] as String).add(const Duration(hours: 1));
 }
 
 class BookingProfile {
   final String name, headline, bio, timezone;
   final List<int> durations;
-  BookingProfile.fromJson(Json j)
-    : name = j['name'] as String,
-      headline = j['headline'] as String? ?? 'Let’s find a time',
-      bio = j['bio'] as String? ?? '',
-      timezone = j['timezone'] as String,
-      durations = (j['durations'] as List).cast<int>();
+  final int defaultDuration;
+  BookingProfile._(this.name, this.headline, this.bio, this.timezone, this.durations, this.defaultDuration);
+
+  factory BookingProfile.fromJson(Json j) {
+    final durations = [
+      for (final d in j['durations'] is List ? j['durations'] as List : const [])
+        if (asInt(d) case final int minutes when minutes > 0) minutes,
+    ];
+    if (durations.isEmpty) durations.add(30);
+    final preferred = asInt(j['default_duration']);
+    return BookingProfile._(
+      (j['name'] as String?) ?? 'Schedio host',
+      (j['booking_headline'] ?? j['headline']) as String? ?? 'Let’s find a time',
+      (j['booking_bio'] ?? j['bio']) as String? ?? '',
+      (j['timezone'] as String?) ?? 'UTC',
+      durations,
+      durations.contains(preferred) ? preferred! : durations.first,
+    );
+  }
 }
 
 class Slot {
@@ -296,4 +340,14 @@ class Slot {
   Slot.fromJson(Json j)
     : start = DateTime.parse(j['start_time'] as String),
       end = DateTime.parse(j['end_time'] as String);
+}
+
+/// Formats [t] as wall-clock time with its own UTC offset (no "Z").
+String isoWithOffset(DateTime t) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  final o = t.timeZoneOffset;
+  final m = o.inMinutes.abs();
+  return '${t.year.toString().padLeft(4, '0')}-${two(t.month)}-${two(t.day)}'
+      'T${two(t.hour)}:${two(t.minute)}:${two(t.second)}'
+      '${o.isNegative ? '-' : '+'}${two(m ~/ 60)}:${two(m % 60)}';
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/push.dart';
 import '../../core/providers.dart';
 import '../../core/widgets.dart';
 
@@ -68,7 +69,8 @@ class _NotificationPreferencesPanelState
         await service.sync(ref.read(apiProvider), account);
       }
       if (mounted) setState(() => deviceAlerts = enabled);
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('Schedio device alerts failed (${e.runtimeType}: $e)\n$stack');
       if (mounted) {
         setState(() {
           message = friendlyError(e);
@@ -118,6 +120,8 @@ class _NotificationPreferencesPanelState
     }
   }
 
+  bool get pushBuild => ref.read(pushServiceProvider).enabled;
+
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -130,13 +134,31 @@ class _NotificationPreferencesPanelState
             const SizedBox(height: 4),
             Text('Where Schedio can reach you.', style: AppText.helper),
             const SizedBox(height: 16),
-            SwitchRow(
-              title: 'Device alerts',
-              subtitle: 'Alerts for new inbox activity when Schedio refreshes. Background push is not enabled.',
-              icon: Icons.phone_iphone_rounded,
-              value: deviceAlerts,
-              onChanged: busy ? null : toggleDeviceAlerts,
-            ),
+            if (pushBuild)
+              ValueListenableBuilder<PushStatus>(
+                valueListenable: ref.read(pushServiceProvider).status,
+                builder: (context, status, _) => SwitchRow(
+                  title: 'Push notifications',
+                  subtitle: switch (status) {
+                    PushStatus.active => 'On for this device. Reminders and updates arrive even when Schedio is closed.',
+                    PushStatus.blocked => 'Off. Allow notifications for Schedio in Android settings, then reopen Schedio.',
+                    _ => 'Setting up. Schedio is connecting to Google Play services and keeps trying automatically.',
+                  },
+                  icon: status == PushStatus.active
+                      ? Icons.notifications_active_outlined
+                      : Icons.notifications_paused_outlined,
+                  value: status == PushStatus.active,
+                  onChanged: null,
+                ),
+              )
+            else
+              SwitchRow(
+                title: 'Device alerts',
+                subtitle: 'Alerts for new inbox activity when Schedio refreshes.',
+                icon: Icons.phone_iphone_rounded,
+                value: deviceAlerts,
+                onChanged: busy ? null : toggleDeviceAlerts,
+              ),
             SwitchRow(
               title: 'In app notifications',
               icon: Icons.notifications_none_rounded,

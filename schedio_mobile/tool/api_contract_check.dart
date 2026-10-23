@@ -61,6 +61,9 @@ const routes = [
   Route('POST', 'tasks'),
   Route('GET', 'tasks/{id}'),
   Route('PATCH', 'tasks/{id}/status'),
+  // API v2.1 (reported fixed in backend commit 04b0e99).
+  Route('PUT', 'tasks/{id}'),
+  Route('DELETE', 'tasks/{id}'),
   Route('GET', 'rooms', keys: ['data']),
   Route('POST', 'rooms'),
   Route('GET', 'rooms/{id}'),
@@ -92,8 +95,9 @@ Future<({int status, String type, Object? body})> fetch(
   HttpClient client,
   Uri uri, {
   String? token,
+  String method = 'GET',
 }) async {
-  final request = await client.getUrl(uri);
+  final request = await client.openUrl(method, uri);
   request.headers.set(HttpHeaders.acceptHeader, 'application/json');
   final host = Platform.environment['SCHEDIO_HOST'];
   if (host != null && host.isNotEmpty) request.headers.host = host;
@@ -116,6 +120,7 @@ String classify(({int status, String type, Object? body}) r) {
   if (r.status == 404 && (r.type != 'application/json' || message.startsWith('The route'))) {
     return 'MISSING';
   }
+  if (r.status == 405) return 'MISSING (method not allowed)';
   if (r.status == 404) return 'PRESENT (record not found)';
   if (r.status >= 500) return 'ERROR';
   if (r.type != 'application/json') return 'NOT JSON';
@@ -149,13 +154,18 @@ Future<void> main(List<String> args) async {
     final uri = base.resolve(route.query.isEmpty ? path : '$path?${route.query}');
     String result, probe, authed = '-';
     try {
-      final r = await fetch(client, uri);
+      // Protected routes are probed with their real method and no token: Laravel
+      // answers 401 (route exists) or 405 (method missing) before touching data.
+      // Public routes are only probed with GET, so nothing is ever submitted.
+      final probeMethod = route.auth ? route.method : 'GET';
+      final r = await fetch(client, uri, method: probeMethod);
       result = classify(r);
-      probe = 'GET ${r.status} ${r.type.isEmpty ? 'no type' : r.type}';
+      if (r.status == 405 && probeMethod != route.method) result = 'PRESENT';
+      probe = '$probeMethod ${r.status} ${r.type.isEmpty ? 'no type' : r.type}';
       if (result == 'PRESENT' && route.auth && route.method == 'GET' && r.status != 401) {
         result = 'OPEN';
       }
-      if (token != null && route.readable && result != 'MISSING') {
+      if (token != null && route.readable && !result.startsWith('MISSING')) {
         final a = await fetch(client, uri, token: token);
         final keys = a.body is Map ? (a.body as Map).keys.toSet() : <dynamic>{};
         final lacking = route.keys.where((k) => !keys.contains(k)).toList();
@@ -168,14 +178,14 @@ Future<void> main(List<String> args) async {
       result = 'UNREACHABLE';
       probe = e.runtimeType.toString();
     }
-    if (result == 'MISSING' || result == 'UNREACHABLE') missing++;
+    if (result.startsWith('MISSING') || result == 'UNREACHABLE') missing++;
     if (['ERROR', 'NOT JSON', 'OPEN'].contains(result)) problems++;
     stdout.writeln('| ${route.method} | `${route.path}` | $result | $probe | $authed |');
   }
   client.close(force: true);
   stdout.writeln('');
   stdout.writeln('Summary: ${routes.length} endpoints, $missing missing or unreachable, $problems with problems.');
-  stdout.writeln('PRESENT: route exists (401, 405, 422 or 200 as JSON). MISSING: Laravel route-not-found or an HTML 404. '
-      'OPEN: a protected read answered without a token. Probes are GET requests without side effects.');
+  stdout.writeln('PRESENT: route exists (401, 422 or 200 as JSON). MISSING: Laravel route-not-found or an HTML 404. '
+      'OPEN: a protected read answered without a token. Protected routes are probed with their own method and no token (rejected before any change); public routes only with GET.');
   exit(missing == 0 && problems == 0 ? 0 : 1);
 }

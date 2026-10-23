@@ -55,22 +55,23 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       final api = ref.read(apiProvider);
       final path = 'public/booking/${Uri.encodeComponent(username.text.trim())}';
       if (loadProfile) {
-        final p = BookingProfile.fromJson((await api.request(path))['data'] as Json);
+        final p = BookingProfile.fromJson(resultOf(await api.request(path)));
         if (!mounted || id != request) return;
         setState(() {
           profile = p;
-          duration = p.durations.first;
+          duration = p.defaultDuration;
         });
       }
-      final list =
-          (await api.request(
-                '$path/slots',
-                query: {
-                  'date': DateFormat('yyyy-MM-dd').format(day),
-                  'duration': duration,
-                },
-              ))['data']
-              as List;
+      final reply = await api.request(
+        '$path/slots',
+        query: {
+          'date': DateFormat('yyyy-MM-dd').format(day),
+          'duration': duration,
+        },
+      );
+      final raw = reply['slots'] ?? asMap(reply['data'])?['slots'] ?? reply['data'];
+      if (raw is! List) throw const FormatException('booking slots');
+      final list = raw;
       if (mounted && id == request) {
         setState(() => slots = list.map((e) => Slot.fromJson(e as Json)).toList());
       }
@@ -99,13 +100,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               'client_email': email.text,
               'client_company': company.text,
               'notes': notes.text,
-              'start_time': chosen!.start.toUtc().toIso8601String(),
+              'start_time': apiTime(chosen!.start, profile!.timezone),
               'duration_minutes': duration,
             },
           );
       ref.read(refreshProvider.notifier).refresh();
       if (mounted) {
-        calendarExport = (response['data'] as Json)['calendar_export_url'] as String?;
+        calendarExport = resultOf(response)['calendar_export_url'] as String?;
         haptic(HapticKind.medium);
         setState(() => confirmation = dateLabel(chosen!.start, profile!.timezone));
       }
@@ -353,7 +354,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          if (slots.isEmpty && !busy)
+          if (slots.isEmpty && !busy && error == null)
             const EmptyState(
               icon: Icons.event_busy_outlined,
               title: 'No available slots',

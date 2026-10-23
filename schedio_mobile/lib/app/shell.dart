@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../core/api.dart';
 import '../core/models.dart';
 import '../core/providers.dart';
 import '../core/push.dart';
@@ -82,7 +83,9 @@ class _WorkspaceShellState extends ConsumerState<WorkspaceShell>
       ..onForeground = (message) {
         ref.invalidate(dashboardProvider);
       };
-    unawaited(push.start().catchError((Object _) {}));
+    unawaited(push.start().catchError((Object e) {
+      debugPrint('Schedio push registration failed (${e.runtimeType}: ${e is ApiFailure ? 'HTTP ${e.status} ${e.message}' : e})');
+    }));
   }
 
   void openFromPush(PushMessage message) {
@@ -111,6 +114,8 @@ class _WorkspaceShellState extends ConsumerState<WorkspaceShell>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       startPolling();
+      final push = ref.read(pushServiceProvider);
+      unawaited(push.status.value == PushStatus.blocked ? push.start() : push.retryNow());
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       poll?.cancel();

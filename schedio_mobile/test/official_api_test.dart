@@ -189,7 +189,10 @@ void main() {
         },
       );
       final d = await repo.dashboard();
-      expect((d.today, d.upcoming, d.tasks, d.unread), (3, 6, 5, 2));
+      expect((d.today, d.upcoming, d.tasks), (3, 6, 5));
+      // The badge follows the inbox (the fake inbox holds 1 unread), not the
+      // dashboard metric (2); see test/inbox_badge_test.dart.
+      expect(d.unread, 1);
       expect(d.meetings.map((m) => m.title), ['Sprint planning', 'Client review']);
     });
 

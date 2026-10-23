@@ -257,7 +257,7 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen> {
                       },
                       onShift: shiftStage,
                       onAdd: () => openEditor(context, Module.clients),
-                      canManage: (r) => r.canManage || account?.canAdminister == true,
+                      canManage: (r) => r.canManageAs(account),
                     );
                   },
                 ),

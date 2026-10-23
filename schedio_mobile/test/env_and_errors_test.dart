@@ -113,7 +113,7 @@ void main() {
       );
       expect(
         await failureFor(400, {'message': 'ErrorException in /var/www/app/Http/Kernel.php'}),
-        'Something went wrong. Please try again.',
+        'Something went wrong (HTTP 400). Please try again.',
       );
     });
 
