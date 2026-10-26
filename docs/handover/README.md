@@ -1,7 +1,9 @@
-# Schedio Mobile Handover Package (release r7, 2026-10-24)
+# Schedio Mobile Handover Package (release r8, 2026-10-26)
 
 | Document | Contents |
 |---|---|
+| [CALENDAR_MEETINGS_FIX_REPORT.md](CALENDAR_MEETINGS_FIX_REPORT.md) | My Meetings "could not read" root cause and fix, Calendar Hub date fixes, tests and phone results (2026-10-27) |
+| [PHONE_QA_REPORT_R8.md](PHONE_QA_REPORT_R8.md) | Physical-device QA of r8 (2026-10-26): every screen, forms, CRUD, offline, push, results and evidence |
 | [FINAL_QA_REPORT.md](FINAL_QA_REPORT.md) | Overall status, full feature matrix, fixes, automated test results |
 | [BACKEND_INTEGRATION_REPORT.md](BACKEND_INTEGRATION_REPORT.md) | Live API routes, v2.1 deployment status, Laravel actions |
 | [FIREBASE_VERIFICATION_REPORT.md](FIREBASE_VERIFICATION_REPORT.md) | Push, token, tap routing, inbox, preferences |

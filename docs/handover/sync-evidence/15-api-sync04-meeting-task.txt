@@ -1,0 +1,18 @@
+Sync test 04b - website -> mobile: meeting + action item created on the website
+Run: 2026-10-26 23:12 via integration_test/sync_task_test.dart on the phone (read-only; no writes).
+SYNCT account: Hammad Developer (user 3), timezone UTC, company 1 Schedio HQ
+SYNCT account is in Schedio HQ (company 1): PASS
+SYNCT API: exactly one meeting "[TEST] Sync Meeting 01" (found 1): PASS
+SYNCT API meeting: id 28, start 2026-10-27T10:00:00+05:00, end 2026-10-27T10:30:00+05:00, timezone UTC, status scheduled, type virtual, organizer Hammad Developer, client null, description "Sync test 04 – meeting with action item"
+SYNCT API tasks titled "[TEST] Sync Task 01": 2
+SYNCT API task: id 17, meeting_id 28, assignee Hammad Developer (id 3), creator Hammad Developer, priority medium, status todo, due 2026-10-28T23:06:00+05:00, description "Website to mobile task sync test"
+SYNCT API task: id 16, meeting_id 28, assignee Hammad Developer (id 3), creator Hammad Developer, priority medium, status todo, due 2026-10-28T23:06:00+05:00, description "Website to mobile task sync test"
+SYNCT API: task(s) "[TEST] Sync Task 01" exist: PASS
+SYNCT API: every task is linked to the meeting: PASS
+SYNCT note: 2 identical tasks (duplicate submit on the website)
+SYNCT Meetings list shows "[TEST] Sync Meeting 01": PASS
+SYNCT meeting detail opens: PASS
+SYNCT meeting detail shows the task 0 time(s)
+SYNCT meeting detail lists the action item: FAIL
+SYNCT My Tasks shows "[TEST] Sync Task 01" (2 shown, 2 in the API): PASS
+SYNCT SUMMARY: meeting detail lists the action item

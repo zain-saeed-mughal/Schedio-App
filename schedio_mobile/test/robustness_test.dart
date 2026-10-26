@@ -136,7 +136,9 @@ void main() {
   testWidgets('booking: a date tapped while slots are loading is not ignored', (tester) async {
     phoneSize(tester, height: 1800);
     final backend = FakeBackend();
-    final now = DateTime.now();
+    // Dates are the host's (UTC here), not the phone's.
+    final utcNow = DateTime.now().toUtc();
+    final now = DateTime(utcNow.year, utcNow.month, utcNow.day);
     final tomorrow = DateTime(now.year, now.month, now.day + 1);
     String day(DateTime d) => '${d.year}-${'${d.month}'.padLeft(2, '0')}-${'${d.day}'.padLeft(2, '0')}';
     final todayHeld = Completer<void>();

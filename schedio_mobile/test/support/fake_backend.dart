@@ -206,6 +206,8 @@ Widget harness(FakeBackend backend, Widget child, {List<dynamic> overrides = con
     ..httpClientAdapter = backend;
   final api = Api(client: dio)..token = 'test-token';
   return ProviderScope(
+    // Same retry policy as the app (main.dart).
+    retry: schedioRetry,
     overrides: [
       apiProvider.overrideWithValue(api),
       authProvider.overrideWith(() => FixtureAuth(backend.user)),

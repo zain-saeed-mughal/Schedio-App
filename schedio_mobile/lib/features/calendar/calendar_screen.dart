@@ -8,6 +8,7 @@ import '../../core/models.dart';
 import '../../core/providers.dart';
 import '../../core/widgets.dart';
 import '../workspace/records_screen.dart';
+import 'calendar_math.dart';
 
 enum CalendarView { week, month, day, agenda }
 
@@ -27,49 +28,57 @@ class CalendarScreen extends ConsumerStatefulWidget {
 }
 
 class _CalendarScreenState extends ConsumerState<CalendarScreen> {
+  /// Calendar dates (UTC midnights, see calendar_math.dart).
   late DateTime selected, focused;
   CalendarView view = CalendarView.week;
+
+  tz.Location get location => locationFor(ref.read(authProvider).value?.timezone ?? 'UTC');
 
   @override
   void initState() {
     super.initState();
-    final now = tz.TZDateTime.now(
-      locationFor(ref.read(authProvider).value?.timezone ?? 'UTC'),
-    );
-    selected = DateTime(now.year, now.month, now.day);
-    focused = selected;
+    selected = focused = todayIn(location);
   }
 
   void shift(int direction) => setState(() {
     switch (view) {
       case CalendarView.day:
-        selected = DateTime(selected.year, selected.month, selected.day + direction);
-        focused = selected;
+        selected = focused = clampDay(addDays(selected, direction));
       case CalendarView.week:
-        selected = DateTime(selected.year, selected.month, selected.day + 7 * direction);
-        focused = selected;
+        selected = focused = clampDay(addDays(selected, 7 * direction));
       case CalendarView.month:
       case CalendarView.agenda:
-        focused = DateTime(focused.year, focused.month + direction, 1);
-        selected = focused;
+        focused = clampDay(addMonths(focused, direction));
+        selected = selectionForMonth(focused, todayIn(location));
     }
   });
 
-  void goToday(tz.Location location) => setState(() {
-    final now = tz.TZDateTime.now(location);
-    selected = DateTime(now.year, now.month, now.day);
+  void goToday() => setState(() => selected = focused = todayIn(location));
+
+  void changeView(CalendarView v) => setState(() {
+    view = v;
     focused = selected;
   });
 
-  String get rangeTitle => switch (view) {
-    CalendarView.day => DateFormat('EEE, MMM d').format(selected),
-    CalendarView.week => () {
-      final monday = DateTime(selected.year, selected.month, selected.day - selected.weekday + 1);
-      final sunday = DateTime(monday.year, monday.month, monday.day + 6);
-      return monday.month == sunday.month
-          ? '${DateFormat('MMM d').format(monday)} to ${sunday.day}'
-          : '${DateFormat('MMM d').format(monday)} to ${DateFormat('MMM d').format(sunday)}';
-    }(),
+  /// A swipe on the grid: week view moves the selection with the week, month
+  /// view selects today (if shown) or the 1st, so titles and lists follow.
+  void onPage(DateTime f) => setState(() {
+    final page = dateOf(f);
+    // Ignore repeat reports for the page already shown.
+    if (view == CalendarView.week ? sameDay(weekStartOf(page), weekStartOf(focused)) : page.year == focused.year && page.month == focused.month) {
+      return;
+    }
+    if (view == CalendarView.week) {
+      selected = focused = dateOf(f);
+    } else {
+      focused = dateOf(f);
+      selected = selectionForMonth(focused, todayIn(location));
+    }
+  });
+
+  String rangeTitle(DateTime today) => switch (view) {
+    CalendarView.day => DateFormat(selected.year == today.year ? 'EEE, MMM d' : 'EEE, MMM d, y').format(selected),
+    CalendarView.week => weekTitle(selected),
     _ => DateFormat('MMMM yyyy').format(focused),
   };
 
@@ -77,16 +86,77 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   Widget build(BuildContext context) {
     final zone = ref.watch(authProvider).value?.timezone ?? 'UTC';
     final location = locationFor(zone);
-    final query = (
-      start: tz.TZDateTime(location, focused.year, focused.month, -6),
-      end: tz.TZDateTime(location, focused.year, focused.month + 1, 8),
-    );
+    final today = todayIn(location);
+    final query = feedRange(focused, location);
     final value = ref.watch(calendarProvider(query));
+    final events = [...?value.value]..sort((a, b) => a.start.compareTo(b.start));
 
-    bool onDay(CalendarEntry e, DateTime d) {
-      final from = tz.TZDateTime(location, d.year, d.month, d.day);
-      final to = tz.TZDateTime(location, d.year, d.month, d.day + 1);
-      return e.start.isBefore(to) && e.end.isAfter(from);
+    bool onDay(CalendarEntry e, DateTime d) => occursOn(e.start, e.end, d, location);
+
+    final week = weekOf(selected);
+    final monthStart = DateTime.utc(focused.year, focused.month, 1);
+    final List<CalendarEntry> shown = switch (view) {
+      CalendarView.agenda => events
+          .where((e) => overlaps(e.start, e.end, startOfDay(monthStart, location),
+              startOfDay(addMonths(monthStart, 1), location)))
+          .toList(),
+      CalendarView.week => events.where((e) => week.any((d) => onDay(e, d))).toList(),
+      _ => events.where((e) => onDay(e, selected)).toList(),
+    };
+    final listTitle = switch (view) {
+      CalendarView.month => dayHeader(selected),
+      CalendarView.week => week.any((d) => sameDay(d, today))
+          ? 'This week'
+          : 'Week of ${DateFormat('MMM d').format(week.first)}',
+      _ => 'Agenda',
+    };
+
+    final Widget results;
+    if (value.hasError && !value.isLoading) {
+      results = ErrorPanel(
+        inline: true,
+        message: friendlyError(value.error!),
+        retry: () => ref.invalidate(calendarProvider(query)),
+      );
+    } else if (!value.hasValue || value.isLoading && value.hasError) {
+      results = const SizedBox(height: 200, child: Center(child: SchedioLoadingIndicator()));
+    } else if (view == CalendarView.day) {
+      results = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (shown.isEmpty) ...[
+            const EmptyState(
+              icon: Icons.self_improvement_rounded,
+              title: 'A little breathing room',
+              message: 'No scheduled items in this view.',
+            ),
+            const SizedBox(height: 16),
+          ],
+          GlassCard(
+            tone: GlassTone.panel,
+            padding: const EdgeInsets.fromLTRB(4, 12, 12, 12),
+            child: DayTimeGrid(
+              day: selected,
+              entries: shown,
+              timezone: zone,
+              onTap: (e) => openEntry(context, e),
+            ),
+          ),
+        ],
+      );
+    } else if (shown.isEmpty) {
+      results = const EmptyState(
+        icon: Icons.self_improvement_rounded,
+        title: 'A little breathing room',
+        message: 'No scheduled items in this view.',
+      );
+    } else {
+      results = _AgendaList(
+        entries: shown,
+        timezone: zone,
+        grouped: view != CalendarView.month,
+        from: view == CalendarView.week ? week.first : (view == CalendarView.agenda ? monthStart : null),
+      );
     }
 
     return TabPage(
@@ -105,7 +175,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             const SizedBox(height: 16),
             SegmentedTabs<CalendarView>(
               selected: view,
-              onChanged: (v) => setState(() => view = v),
+              onChanged: changeView,
               segments: [
                 for (final v in CalendarView.values) Segment(v, v.label),
               ],
@@ -121,10 +191,15 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 ),
                 const SizedBox(width: 4),
                 Expanded(
-                  child: Text(
-                    rangeTitle,
-                    textAlign: TextAlign.center,
-                    style: AppText.pageTitle.copyWith(fontSize: 19, letterSpacing: -0.6),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      rangeTitle(today),
+                      key: const ValueKey('calendar-range-title'),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      style: AppText.pageTitle.copyWith(fontSize: 19, letterSpacing: -0.6),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 4),
@@ -135,116 +210,53 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   onPressed: () => shift(1),
                 ),
                 const SizedBox(width: 6),
-                _TodayButton(onTap: () => goToday(location)),
+                _TodayButton(onTap: goToday),
               ],
             ),
             const SizedBox(height: 14),
-            value.when(
-              loading: () => const SizedBox(
-                height: 320,
-                child: Center(child: SchedioLoadingIndicator()),
+            if (view == CalendarView.week || view == CalendarView.month) ...[
+              GlassCard(
+                tone: GlassTone.panel,
+                padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+                child: LayoutBuilder(
+                  builder: (context, constraints) => Align(
+                    alignment: Alignment.topCenter,
+                    child: SizedBox(
+                      width: constraints.maxWidth.floorToDouble(),
+                      child: StyledCalendar(
+                        // A fresh grid per shown week or month. table_calendar 3.3.0 loses
+                        // track of its page after programmatic page changes (buttons,
+                        // Today, view switches, rebuilds during a swipe), and the next
+                        // swipe could then jump months away (seen on the phone).
+                        key: ValueKey(view == CalendarView.week
+                            ? 'week-${weekStartOf(focused)}'
+                            : 'month-${focused.year}-${focused.month}'),
+                        focused: focused,
+                        selected: selected,
+                        today: today,
+                        week: view == CalendarView.week,
+                        events: (d) => events.where((e) => onDay(e, d)).toList(),
+                        onSelect: (s, _) => setState(() => selected = focused = dateOf(s)),
+                        onPage: onPage,
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              error: (e, _) => ErrorPanel(
-                inline: true,
-                message: friendlyError(e),
-                retry: () => ref.invalidate(calendarProvider(query)),
+              const SizedBox(height: 20),
+            ],
+            if (view != CalendarView.day) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(listTitle, style: AppText.cardTitle.copyWith(fontSize: 17)),
+                  ),
+                  Text(zone, style: AppText.monoTiny),
+                ],
               ),
-              data: (events) {
-                final sorted = [...events]..sort((a, b) => a.start.compareTo(b.start));
-                List<CalendarEntry> shown;
-                if (view == CalendarView.agenda) {
-                  shown = sorted
-                      .where((e) => localIn(e.start, zone).month == focused.month ||
-                          localIn(e.end, zone).month == focused.month)
-                      .toList();
-                } else if (view == CalendarView.week) {
-                  final monday = DateTime(selected.year, selected.month, selected.day - selected.weekday + 1);
-                  final days = List.generate(7, (i) => DateTime(monday.year, monday.month, monday.day + i));
-                  shown = sorted.where((e) => days.any((d) => onDay(e, d))).toList();
-                } else {
-                  shown = sorted.where((e) => onDay(e, selected)).toList();
-                }
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (view == CalendarView.week || view == CalendarView.month)
-                      GlassCard(
-                        tone: GlassTone.panel,
-                        padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
-                        child: LayoutBuilder(
-                          builder: (context, constraints) => Align(
-                            alignment: Alignment.topCenter,
-                            child: SizedBox(
-                              width: constraints.maxWidth.floorToDouble(),
-                              child: _StyledCalendar(
-                                focused: focused,
-                                selected: selected,
-                                week: view == CalendarView.week,
-                                events: (d) => sorted.where((e) => onDay(e, d)).toList(),
-                                onSelect: (s, f) => setState(() {
-                                  selected = s;
-                                  focused = f;
-                                }),
-                                onPage: (f) => setState(() => focused = f),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    if (view == CalendarView.day) ...[
-                      if (shown.isEmpty) ...[
-                        const EmptyState(
-                          icon: Icons.self_improvement_rounded,
-                          title: 'A little breathing room',
-                          message: 'No scheduled items in this view.',
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                      GlassCard(
-                        tone: GlassTone.panel,
-                        padding: const EdgeInsets.fromLTRB(4, 12, 12, 12),
-                        child: DayTimeGrid(
-                          day: selected,
-                          entries: shown,
-                          timezone: zone,
-                          onTap: (e) => openEntry(context, e),
-                        ),
-                      ),
-                    ] else ...[
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              view == CalendarView.month
-                                  ? dayHeader(selected)
-                                  : view == CalendarView.week
-                                  ? 'This week'
-                                  : 'Agenda',
-                              style: AppText.cardTitle.copyWith(fontSize: 17),
-                            ),
-                          ),
-                          Text(zone, style: AppText.monoTiny),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      if (shown.isEmpty)
-                        const EmptyState(
-                          icon: Icons.self_improvement_rounded,
-                          title: 'A little breathing room',
-                          message: 'No scheduled items in this view.',
-                        )
-                      else
-                        _AgendaList(
-                          entries: shown,
-                          timezone: zone,
-                          grouped: view != CalendarView.month,
-                        ),
-                    ],
-                  ],
-                );
-              },
-            ),
+              const SizedBox(height: 12),
+            ],
+            results,
           ],
         ),
       ),
@@ -374,15 +386,17 @@ class _TodayButtonState extends State<_TodayButton> {
   );
 }
 
-class _StyledCalendar extends StatelessWidget {
-  final DateTime focused, selected;
+class StyledCalendar extends StatelessWidget {
+  final DateTime focused, selected, today;
   final bool week;
   final List<CalendarEntry> Function(DateTime) events;
   final void Function(DateTime, DateTime) onSelect;
   final ValueChanged<DateTime> onPage;
-  const _StyledCalendar({
+  const StyledCalendar({
+    super.key,
     required this.focused,
     required this.selected,
+    required this.today,
     required this.week,
     required this.events,
     required this.onSelect,
@@ -397,16 +411,18 @@ class _StyledCalendar extends StatelessWidget {
       color: AppColors.calendarDay,
     );
     return TableCalendar<CalendarEntry>(
-      firstDay: DateTime(2000),
-      lastDay: DateTime(2100),
-      focusedDay: focused,
+      firstDay: calendarFirstDay,
+      lastDay: calendarLastDay,
+      focusedDay: clampDay(focused),
+      // Today in the account timezone, not the phone's.
+      currentDay: today,
       headerVisible: false,
       startingDayOfWeek: StartingDayOfWeek.monday,
       calendarFormat: week ? CalendarFormat.week : CalendarFormat.month,
       availableGestures: AvailableGestures.horizontalSwipe,
       rowHeight: 48,
       daysOfWeekHeight: 26,
-      selectedDayPredicate: (d) => isSameDay(d, selected),
+      selectedDayPredicate: (d) => sameDay(d, selected),
       eventLoader: events,
       onDaySelected: onSelect,
       onPageChanged: onPage,
@@ -491,10 +507,13 @@ class _AgendaList extends StatelessWidget {
   final List<CalendarEntry> entries;
   final String timezone;
   final bool grouped;
+  /// Events that began before this date are listed under it.
+  final DateTime? from;
   const _AgendaList({
     required this.entries,
     required this.timezone,
     required this.grouped,
+    this.from,
   });
 
   @override
@@ -502,7 +521,8 @@ class _AgendaList extends StatelessWidget {
     final children = <Widget>[];
     String? lastDay;
     for (final e in entries) {
-      final local = localIn(e.start, timezone);
+      final startDay = dateOf(localIn(e.start, timezone));
+      final local = from != null && startDay.isBefore(from!) ? from! : startDay;
       final key = DateFormat('yyyy-MM-dd').format(local);
       if (grouped && key != lastDay) {
         lastDay = key;
@@ -622,17 +642,16 @@ class DayTimeGrid extends StatelessWidget {
   static const hourHeight = slot * 2;
   static const gutter = 52.0;
 
-  double offsetFor(DateTime local, tz.TZDateTime dayStart) {
-    final minutes = local.difference(dayStart).inMinutes - startHour * 60;
+  double offsetFor(DateTime instant, tz.Location location) {
+    final minutes = wallMinutes(instant, day, location) - startHour * 60;
     return (minutes / 60 * hourHeight).clamp(0, (endHour - startHour) * hourHeight);
   }
 
   @override
   Widget build(BuildContext context) {
     final location = locationFor(timezone);
-    final dayStart = tz.TZDateTime(location, day.year, day.month, day.day);
     final now = tz.TZDateTime.now(location);
-    final isToday = isSameDay(now, day);
+    final isToday = sameDay(todayIn(location, now: now), day);
     final height = (endHour - startHour) * hourHeight;
     final allDay = entries.where((e) => e.end.difference(e.start).inHours >= 23).toList();
     final timed = entries.where((e) => !allDay.contains(e)).toList();
@@ -719,8 +738,8 @@ class DayTimeGrid extends StatelessWidget {
                   ],
                   for (final e in timed)
                     () {
-                      final top = offsetFor(localIn(e.start, timezone), dayStart);
-                      final bottom = offsetFor(localIn(e.end, timezone), dayStart);
+                      final top = offsetFor(e.start, location);
+                      final bottom = offsetFor(e.end, location);
                       final col = columnOf[e]!;
                       final w = width / count;
                       return Positioned(
@@ -733,7 +752,7 @@ class DayTimeGrid extends StatelessWidget {
                     }(),
                   if (isToday && now.hour >= startHour && now.hour < endHour)
                     Positioned(
-                      top: offsetFor(now, dayStart) - 5,
+                      top: offsetFor(now, location) - 5,
                       left: gutter - 6,
                       right: 0,
                       child: IgnorePointer(

@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import 'api_time.dart';
 import 'env.dart';
 import 'models.dart';
 
@@ -136,6 +140,39 @@ class Api {
       _ => server ?? 'Something went wrong (HTTP $status). Please try again.',
     };
   }
+  /// Pause before the single reconnect retry (tests set it to zero).
+  Duration retryPause = const Duration(milliseconds: 700);
+
+  static bool isConnectionProblem(DioException e) =>
+      e.response == null &&
+      (e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.connectionTimeout ||
+          (e.type == DioExceptionType.unknown && e.error is SocketException));
+
+  /// Drops pooled connections so the next request opens a fresh one. Only the
+  /// real network adapter is replaced; test adapters are left alone.
+  void resetConnections() {
+    final adapter = dio.httpClientAdapter;
+    if (adapter is IOHttpClientAdapter) {
+      adapter.close(force: true);
+      dio.httpClientAdapter = IOHttpClientAdapter();
+    }
+  }
+
+  Future<Json> _send(String path, String method, Json? data, Json? query) async =>
+      _parse(await dio.request<dynamic>(path, data: data, queryParameters: query, options: Options(method: method)));
+
+  Json _parse(Response<dynamic> r) {
+    final reply = r.data;
+    if (r.statusCode == 204 || reply == null || (reply is String && reply.trim().isEmpty)) {
+      return <String, dynamic>{};
+    }
+    if (reply is! Map<String, dynamic>) {
+      throw const ApiFailure('The server returned an unexpected response.');
+    }
+    return reply;
+  }
+
   Future<Json> request(
     String path, {
     String method = 'GET',
@@ -143,20 +180,19 @@ class Api {
     Json? query,
   }) async {
     try {
-      final r = await dio.request<dynamic>(
-        path,
-        data: data,
-        queryParameters: query,
-        options: Options(method: method),
-      );
-      final reply = r.data;
-      if (r.statusCode == 204 || reply == null || (reply is String && reply.trim().isEmpty)) {
-        return <String, dynamic>{};
+      final Response<dynamic> r;
+      try {
+        r = await dio.request<dynamic>(path, data: data, queryParameters: query, options: Options(method: method));
+      } on DioException catch (e) {
+        // After the network drops and comes back, pooled connections and
+        // lookups can stay broken until the app restarts. For reads, start a
+        // fresh connection pool and try once more.
+        if (method != 'GET' || !isConnectionProblem(e)) rethrow;
+        resetConnections();
+        await Future<void>.delayed(retryPause);
+        return await _send(path, method, data, query);
       }
-      if (reply is! Map<String, dynamic>) {
-        throw const ApiFailure('The server returned an unexpected response.');
-      }
-      return reply;
+      return _parse(r);
     } on DioException catch (e) {
       final body = e.response?.data;
       final status = e.response?.statusCode;
@@ -234,8 +270,8 @@ class Repository {
       api.request(
         'calendar/feed',
         query: {
-          'start': isoWithOffset(dayStart),
-          'end': isoWithOffset(dayStart.add(const Duration(days: 30))),
+          'start': encodeApiTime(dayStart),
+          'end': encodeApiTime(dayStart.add(const Duration(days: 30))),
           'type': 'meetings',
         },
       ),
@@ -337,8 +373,8 @@ class Repository {
       ((await api.request(
                 'calendar/feed',
                 query: {
-                  'start': isoWithOffset(start.toLocal()),
-                  'end': isoWithOffset(end.toLocal()),
+                  'start': encodeApiTime(start),
+                  'end': encodeApiTime(end),
                 },
               ))['data']
               as List)

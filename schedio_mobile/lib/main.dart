@@ -12,6 +12,7 @@ Future<void> main() async {
   final push = await FirebasePushTransport.create();
   runApp(
     ProviderScope(
+      retry: schedioRetry,
       overrides: [if (push != null) pushTransportProvider.overrideWithValue(push)],
       child: const SchedioApp(),
     ),

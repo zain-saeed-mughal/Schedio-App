@@ -1,0 +1,20 @@
+Sync test 05 - mobile -> website: task 16 todo -> in_progress
+Run: 2026-10-26 23:45 via integration_test/sync_task_status_test.dart on the phone (r9 code).
+Method: the app's own task workflow (My Tasks -> task 16 -> Update status -> In Progress) driven by the integration test because adb taps are blocked on this phone (not tapped by hand). Request sent by the app: PATCH tasks/16/status {status: in_progress}.
+SYNC5 account: Hammad Developer (user 3), company 1 Schedio HQ
+SYNC5 account is in Schedio HQ (company 1): PASS
+SYNC5 production task statuses: [todo, pending, in_progress, review, completed, cancelled]
+SYNC5 production status contract includes in_progress: PASS
+SYNC5 API before task 16: id 16, title "[TEST] Sync Task 01", status todo, priority medium, due 2026-10-28T23:06:00+05:00, meeting_id 28, assignee Hammad Developer (id 3), completed_at null
+SYNC5 API before task 17: id 17, title "[TEST] Sync Task 01", status todo, priority medium, due 2026-10-28T23:06:00+05:00, meeting_id 28, assignee Hammad Developer (id 3), completed_at null
+SYNC5 My Tasks lists task 16 and task 17: PASS
+SYNC5 task 16 detail offers "In Progress" in Update status: PASS
+SYNC5 app confirms "Status updated": PASS
+SYNC5 API after task 16: id 16, title "[TEST] Sync Task 01", status in_progress, priority medium, due 2026-10-28T23:06:00+05:00, meeting_id 28, assignee Hammad Developer (id 3), completed_at null
+SYNC5 API after task 17: id 17, title "[TEST] Sync Task 01", status todo, priority medium, due 2026-10-28T23:06:00+05:00, meeting_id 28, assignee Hammad Developer (id 3), completed_at null
+SYNC5 API: task 16 status is in_progress: PASS
+SYNC5 API: task 16 other fields unchanged: PASS
+SYNC5 API: task 17 unchanged: PASS
+SYNC5 after refresh My Tasks shows task 16 as in progress: PASS
+SYNC5 My Tasks still shows task 17 as todo: PASS
+SYNC5 SUMMARY: all PASS

@@ -5,6 +5,15 @@ Json? asMap(Object? value) =>
 
 Json resultOf(Json response) => asMap(response['data']) ?? response;
 
+/// A text field from the API. Numbers and booleans become text; lists, maps and
+/// null give null, so one unexpected type cannot break a whole screen.
+String? asText(Object? value) => switch (value) {
+  String v => v,
+  num v => v.toString(),
+  bool v => v.toString(),
+  _ => null,
+};
+
 int? asInt(Object? value) => switch (value) {
   int v => v,
   num v => v.toInt(),
@@ -15,7 +24,7 @@ int? asInt(Object? value) => switch (value) {
 
 String? nameOf(Object? value) => switch (value) {
   String v when v.isNotEmpty => v,
-  Map v => (v['name'] ?? v['company_name'] ?? v['title']) as String?,
+  Map v => asText(v['name'] ?? v['company_name'] ?? v['title']),
   _ => null,
 };
 
@@ -31,8 +40,8 @@ class Member {
   const Member(this.id, this.name, [this.status]);
   factory Member.fromJson(Json j) => Member(
     asInt(j['id']) ?? 0,
-    (j['name'] ?? j['company_name'] ?? '') as String,
-    j['status'] as String?,
+    asText(j['name']) ?? asText(j['company_name']) ?? '',
+    asText(j['status']),
   );
 }
 
@@ -52,8 +61,8 @@ class Account {
           : 'UTC',
       bookingUrl = j['booking_url'] as String? ?? '',
       bookingUsername = '${j['booking_username'] ?? j['username'] ?? ''}',
-      title = j['title'] as String?,
-      phone = j['phone'] as String?,
+      title = asText(j['title']),
+      phone = asText(j['phone']),
       company = asMap(j['company'])?['name'] as String?,
       department = asMap(j['department'])?['name'] as String?,
       canAdminister = j['can_administer'] == true,
@@ -117,6 +126,10 @@ class Record {
   final List<Member> participants;
   final List<String> amenities;
   final List<String> attachments;
+  /// Action items of a meeting, from the meeting detail's `tasks` list.
+  final List<Record> meetingTasks;
+  /// Notes of a meeting, from the meeting detail's `notes` list.
+  final List<Record> meetingNotes;
   final String? owner;
   /// Whether the server said the user may manage this record (null: not sent).
   final bool? serverCanManage;
@@ -137,20 +150,18 @@ class Record {
   Record.fromJson(Json j, this.module)
     : id = '${j['id']}',
       title =
-          ((module == Module.administration ? j['name'] : null) ??
-                  j['title'] ??
-                  j['company_name'] ??
-                  j['name'] ??
-                  asMap(j['data'])?['title'] ??
-                  'Meeting note')
-              as String,
-      status = (j['status'] ?? j['approval_status'] ?? '') as String,
+          asText(module == Module.administration ? j['name'] : null) ??
+          asText(j['title']) ??
+          asText(j['company_name']) ??
+          asText(j['name']) ??
+          asText(asMap(j['data'])?['title']) ??
+          'Meeting note',
+      status = asText(j['status']) ?? asText(j['approval_status']) ?? '',
       description =
-          (j['description'] ??
-                  j['registration_notes'] ??
-                  asMap(j['data'])?['message'] ??
-                  '')
-              as String,
+          asText(j['description']) ??
+          asText(j['registration_notes']) ??
+          asText(asMap(j['data'])?['message']) ??
+          '',
       start = _date(j['start_time']),
       end = _date(j['end_time']),
       due = _date(j['due_date'] ?? j['follow_up_date']),
@@ -164,56 +175,71 @@ class Record {
       isCompanyWide = j['is_company_wide'] == true,
       isAllDay = j['is_all_day'] == true,
       isRead = j['read_at'] != null,
-      timezone = j['timezone'] as String?,
-      type = j['type'] as String?,
-      location = j['location'] as String?,
-      meetingLink = j['meeting_link'] as String?,
-      priority = j['priority'] as String?,
-      category = j['category'] as String?,
-      contactName = j['contact_name'] as String?,
-      contactEmail = j['contact_email'] as String?,
-      contactPhone = j['contact_phone'] as String?,
-      contactRole = j['contact_role'] as String?,
-      campaign = j['campaign'] as String?,
-      progress = j['progress'] as String?,
-      notes = j['notes'] as String?,
+      timezone = asText(j['timezone']),
+      type = asText(j['type']),
+      location = asText(j['location']),
+      meetingLink = asText(j['meeting_link']),
+      priority = asText(j['priority']),
+      category = asText(j['category']),
+      contactName = asText(j['contact_name']),
+      contactEmail = asText(j['contact_email']),
+      contactPhone = asText(j['contact_phone']),
+      contactRole = asText(j['contact_role']),
+      campaign = asText(j['campaign']),
+      progress = asText(j['progress']),
+      notes = asText(j['notes']),
       dealValue = j['deal_value']?.toString(),
-      agenda = (j['agenda'] ?? j['title']) as String?,
-      discussion = (j['discussion'] ?? j['content']) as String?,
-      decisions = j['decisions'] as String?,
+      // Meetings send no agenda field (the web form's agenda arrives as the
+      // description); only notes fall back to their title.
+      agenda = asText(j['agenda']) ?? (module == Module.notes ? asText(j['title']) : null),
+      discussion = asText(j['discussion']) ?? asText(j['content']),
+      decisions = asText(j['decisions']),
       actionItems = j['action_items'] is List
           ? (j['action_items'] as List).join('\n')
-          : j['action_items'] as String?,
-      code = j['code'] as String?,
-      role = j['role'] as String?,
-      email = j['email'] as String?,
-      jobTitle = j['title'] as String?,
+          : asText(j['action_items']),
+      code = asText(j['code']),
+      role = asText(j['role']),
+      email = asText(j['email']),
+      jobTitle = asText(j['title']),
       isClientMeeting = asMap(j['metadata'])?['is_client_meeting'] == true,
-      clientName = asMap(j['metadata'])?['client_name'] as String?,
-      clientEmail = asMap(j['metadata'])?['client_email'] as String?,
-      clientCompany = asMap(j['metadata'])?['client_company'] as String?,
+      clientName = asText(asMap(j['metadata'])?['client_name']),
+      clientEmail = asText(asMap(j['metadata'])?['client_email']),
+      clientCompany = asText(asMap(j['metadata'])?['client_company']),
       roomId = asInt(j['room_id'] ?? j['room']),
       departmentId = asInt(j['department_id'] ?? j['department']),
       clientId = asInt(j['client_id'] ?? j['client']),
       assignedTo = asInt(j['assigned_to'] ?? j['assignee']),
       meetingId = asInt(j['meeting_id']) ?? asInt(asMap(j['data'])?['meeting_id']),
       capacity = asInt(j['capacity']),
-      participants = (j['participants'] as List? ?? [])
-          .map((e) => Member.fromJson(e as Json))
-          .toList(),
+      participants = [
+        for (final p in j['participants'] is List ? j['participants'] as List : const [])
+          if (asMap(p) case final Json m) Member.fromJson(m),
+      ],
       amenities = [
         for (final a in j['amenities'] is List ? j['amenities'] as List : const [])
           if (a is String ? a : nameOf(a) case final String text) text,
       ],
+      meetingTasks = module == Module.meetings && j['tasks'] is List
+          ? [
+              for (final t in j['tasks'] as List)
+                if (asMap(t) case final Json task) Record.fromJson(task, Module.tasks),
+            ]
+          : const [],
+      // The meeting detail embeds its notes as a list of note objects;
+      // clients send `notes` as text (read above).
+      meetingNotes = module == Module.meetings && j['notes'] is List
+          ? [
+              for (final n in j['notes'] as List)
+                if (asMap(n) case final Json note) Record.fromJson(note, Module.notes),
+            ]
+          : const [],
       attachments = [
         for (final a in j['attachments'] is List ? j['attachments'] as List : const [])
           if (a is String) a else if (asMap(a) case final Json m) '${m['text'] ?? m['url'] ?? m['name'] ?? ''}',
       ],
-      owner =
-          asMap(
-                j['organizer'] ?? j['assignee'] ?? j['assignedTo'] ?? j['assigned_to'] ?? j['author'],
-              )?['name']
-              as String?;
+      owner = asText(
+        asMap(j['organizer'] ?? j['assignee'] ?? j['assignedTo'] ?? j['assigned_to'] ?? j['author'])?['name'],
+      );
   static DateTime? _date(dynamic v) =>
       v is String ? DateTime.tryParse(v)?.toUtc() : null;
 }

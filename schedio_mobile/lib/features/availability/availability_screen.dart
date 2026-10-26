@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:timezone/timezone.dart' as tz;
 
+import '../../core/api_time.dart';
 import '../../core/models.dart';
 import '../../core/providers.dart';
 import '../../core/widgets.dart';
@@ -37,7 +38,7 @@ class _AvailabilityScreenState extends ConsumerState<AvailabilityScreen> {
       context: context,
       initialDate: today,
       firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+      lastDate: DateTime(2199, 12, 31),
     );
     if (day == null || !mounted) return;
     final time = await showTimePicker(
@@ -72,8 +73,8 @@ class _AvailabilityScreenState extends ConsumerState<AvailabilityScreen> {
               'availability/check',
               method: 'POST',
               data: {
-                'start_time': isoWithOffset(start!),
-                'end_time': isoWithOffset(start!.add(Duration(minutes: duration))),
+                'start_time': encodeApiTime(start!),
+                'end_time': encodeApiTime(start!.add(Duration(minutes: duration))),
                 'room_id': room,
                 'participant_ids': users.toList(),
               },

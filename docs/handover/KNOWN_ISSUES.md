@@ -38,3 +38,30 @@ No known release-blocking defects remain in the Android app or in the API featur
 ## Test data
 
 [TEST] meeting 11 and two completed [TEST] tasks remain in sandbox company 1 (test account only). Delete them once cleanup is approved.
+
+## Added 2026-10-26 (r8 phone QA)
+
+| # | Item | Status |
+|---|---|---|
+| K-25 | Meeting reminder pushes are not sent by the server (a 15-minute reminder never arrived) | Backend, high |
+| ~~K-26~~ | **Resolved 2026-10-27:** `GET meetings/11` now returns HTTP 200 (verified read-only on the phone). The response now embeds `notes` as a list, which r9 cannot read; see K-33 | Closed |
+| K-27 | Closed-app push only partly verified: a fully closed app cannot trigger its own test push | Confirm with `php artisan firebase:test-push` while the app is closed |
+| K-28 | Inbox read/unread and mark all read still untested: no database notification exists for the test account | Needs a real notification |
+| Fixed | Try again stayed on the error after reconnecting (fixed in r8 and verified on the phone) | Done |
+
+## Added 2026-10-26 (sync tests)
+
+| # | Item | Status |
+|---|---|---|
+| K-29 | Website saves entered meeting times as Asia/Karachi whatever timezone is chosen ("10:00 UTC" stored as 10:00 +05:00); the app shows the stored moment in the account's timezone | Backend/website |
+| K-30 | Website "+ Add Action Item" created a duplicate task (IDs 16 and 17) from one entry | Website |
+| K-31 | Website has no standalone task page (tasks are created only as meeting action items) | Web UI, by design or gap |
+| K-32 | Meeting "metadata.is_client_meeting" true with no linked client (meeting 28) | Backend/website |
+| Fixed (r9) | App meeting detail now lists action items; meeting Agenda no longer shows the title | Done |
+
+## Added 2026-10-27 (Calendar Hub and My Meetings)
+
+| # | Issue | Owner |
+|---|---|---|
+| K-33 | **r9 shows "could not read" on every meeting detail.** Production `GET meetings/{id}` now embeds `notes` as a list of note objects; r9 expects text. Fixed in the working tree (not yet in a release build); see CALENDAR_MEETINGS_FIX_REPORT.md | App, fixed (needs next build) |
+| K-34 | Calendar Hub: "today" followed the phone clock instead of the account timezone; week swipes could jump months after Next/Today; DST days drew events an hour off; the calendar stopped at 1 Jan 2100. Fixed in the working tree | App, fixed (needs next build) |

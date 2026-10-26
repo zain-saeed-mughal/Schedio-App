@@ -1,0 +1,16 @@
+Sync test 02 - mobile -> website: client 14 Discovery -> Scheduled
+Run: 2026-10-26 22:40 via integration_test/sync_stage_test.dart on the phone.
+Method: the app's own Pipeline workflow (Shift Stage -> Scheduled -> Move Deal) driven by the integration test, because adb taps are blocked on this phone (not tapped by hand). Request sent by the app: PATCH clients/14/status {status: scheduled}.
+Note (07-after-board-scheduled-column.png shows the board, not the spreadsheet): the 'Spreadsheet' check is a test artifact (the toggle was scrolled off screen and the tap missed); the spreadsheet was not opened.
+SYNC2 account: Hammad Developer (user 3), company 1 Schedio HQ
+SYNC2 API before: id 14, company_name "[TEST] Sync Client 01", contact_name "Test Contact", status discovery, assigned_to Hammad Developer (id 3), campaign "QA Sync Test", deal_value null
+SYNC2 client 14 card is on the Board in Discovery: PASS
+SYNC2 Shift Stage sheet opens for this client: PASS
+SYNC2 app confirms "Deal moved successfully!": PASS
+SYNC2 API after: id 14, company_name "[TEST] Sync Client 01", contact_name "Test Contact", status scheduled, assigned_to Hammad Developer (id 3), campaign "QA Sync Test", deal_value null
+SYNC2 API: client 14 status is scheduled: PASS
+SYNC2 API: same record ID 14: PASS
+SYNC2 API: name, contact, campaign, value and representative unchanged: PASS
+SYNC2 after refresh the Board card shows Scheduled: PASS
+SYNC2 Spreadsheet lists the client as SCHEDULED: FAIL
+SYNC2 SUMMARY: Spreadsheet lists the client as SCHEDULED

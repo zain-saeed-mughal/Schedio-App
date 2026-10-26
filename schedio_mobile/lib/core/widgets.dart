@@ -90,6 +90,9 @@ class AsyncBody<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => value.when(
+    // After an error, Try again shows the loading state instead of leaving the
+    // old error on screen until the new request finishes.
+    skipLoadingOnRefresh: !value.hasError,
     data: builder,
     loading: () => loading ?? const Center(child: SchedioLoadingIndicator()),
     error: (e, _) => ErrorPanel(message: friendlyError(e), retry: retry),

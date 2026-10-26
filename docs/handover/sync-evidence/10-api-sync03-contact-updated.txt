@@ -1,0 +1,19 @@
+Sync test 03 - website -> mobile: client 14 contact changed on the website to 'Test Contact Updated'
+Run: 2026-10-26 22:50 via integration_test/sync_view_test.dart on the phone (read-only: refresh, open client detail, compare app and API; no writes).
+SYNCV account: Hammad Developer (user 3), company 1 Schedio HQ
+SYNCV account is in Schedio HQ (company 1): PASS
+SYNCV API: id 14, company_name "[TEST] Sync Client 01", contact_name "Test Contact Updated", status scheduled, assigned_to Hammad Developer (id 3), campaign "QA Sync Test", deal_value null, contact_role "null", progress "Website to Mobile synchronization test"
+SYNCV API: record ID 14: PASS
+SYNCV API: contact name is "Test Contact Updated": PASS
+SYNCV API: stage is scheduled: PASS
+SYNCV API: company name is "[TEST] Sync Client 01": PASS
+SYNCV API: representative is Hammad Developer: PASS
+SYNCV API: campaign is "QA Sync Test": PASS
+SYNCV Board shows the client in Scheduled after refresh: PASS
+SYNCV Board card shows contact "Test Contact Updated": PASS
+SYNCV client detail screen opens: PASS
+SYNCV detail shows company name: PASS
+SYNCV detail shows contact "Test Contact Updated": PASS
+SYNCV detail shows stage Scheduled: PASS
+SYNCV detail shows representative Hammad Developer: PASS
+SYNCV SUMMARY: all PASS

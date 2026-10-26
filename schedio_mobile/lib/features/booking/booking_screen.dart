@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/api_time.dart';
 import '../../core/models.dart';
 import '../../core/providers.dart';
 import '../../core/widgets.dart';
+import '../calendar/calendar_math.dart';
 
 class BookingScreen extends ConsumerStatefulWidget {
   const BookingScreen({super.key});
@@ -60,6 +62,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         setState(() {
           profile = p;
           duration = p.defaultDuration;
+          // Start on today in the host's timezone (the strip's first day).
+          day = hostToday();
         });
       }
       final reply = await api.request(
@@ -100,7 +104,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               'client_email': email.text,
               'client_company': company.text,
               'notes': notes.text,
-              'start_time': apiTime(chosen!.start, profile!.timezone),
+              'start_time': encodeApiTime(chosen!.start),
               'duration_minutes': duration,
             },
           );
@@ -293,9 +297,20 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     );
   }
 
+  /// Today in the host's timezone (slots are shown in that timezone).
+  DateTime hostToday() {
+    try {
+      final t = todayIn(locationFor(profile?.timezone ?? 'UTC'));
+      return DateTime(t.year, t.month, t.day);
+    } catch (_) {
+      final n = DateTime.now();
+      return DateTime(n.year, n.month, n.day);
+    }
+  }
+
   Widget schedulePanel() {
     final p = profile!;
-    final today = DateTime.now();
+    final today = hostToday();
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

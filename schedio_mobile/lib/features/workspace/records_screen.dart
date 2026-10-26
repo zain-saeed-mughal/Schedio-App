@@ -284,7 +284,9 @@ class _RecordsScreenState extends ConsumerState<RecordsScreen> {
               await ref.read(recordsProvider(query).future);
             },
             child: ref.watch(recordsProvider(query)).when(
-              skipLoadingOnRefresh: true,
+              // Keep the list visible on pull-to-refresh, but show loading
+              // when retrying after an error.
+              skipLoadingOnRefresh: !ref.watch(recordsProvider(query)).hasError,
               loading: () => ListView(
                 padding: pageInsets(context),
                 physics: const NeverScrollableScrollPhysics(),
@@ -553,6 +555,33 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                   ],
                 ),
               ),
+            if (r.module == Module.meetings && r.meetingTasks.isNotEmpty)
+              GlassCard(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(6, 6, 6, 10),
+                      child: Text('Action items (${r.meetingTasks.length})', style: AppText.cardTitle),
+                    ),
+                    for (final t in r.meetingTasks)
+                      DetailRow(
+                        icon: t.status == 'completed' ? Icons.task_alt_rounded : Icons.radio_button_unchecked_rounded,
+                        tint: t.status == 'completed' ? Tint.success : Tint.warning,
+                        title: t.title,
+                        subtitle: [
+                          if (t.status.isNotEmpty) titleCase(t.status),
+                          if (t.priority != null) titleCase(t.priority!),
+                          if (t.due != null) 'Due ${shortDay(t.due, zone)}',
+                          if (t.owner != null) t.owner!,
+                        ].join(' · '),
+                        trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.slate500),
+                        onTap: () => openRecord(context, t),
+                      ),
+                  ],
+                ),
+              ),
             if (r.module == Module.meetings)
               GlassCard(
                 padding: const EdgeInsets.all(12),
@@ -561,7 +590,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                     DetailRow(
                       icon: Icons.sticky_note_2_outlined,
                       tint: Tint.purple,
-                      title: 'Meeting notes',
+                      title: r.meetingNotes.isEmpty ? 'Meeting notes' : 'Meeting notes (${r.meetingNotes.length})',
                       subtitle: 'Agenda, decisions and action items',
                       trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.slate500),
                       onTap: () => Navigator.push(

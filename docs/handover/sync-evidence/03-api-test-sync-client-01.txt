@@ -1,0 +1,6 @@
+Sync check 01 - website -> mobile, client created on schedio.live
+Probe run: 2026-10-26 22:31 PST via integration_test/sync_probe_test.dart (read-only, production API, app's own client)
+SYNC account: Hammad Developer (user 3), role developer, company 1 Schedio HQ
+SYNC clients matching "[TEST] Sync": 1
+SYNC client id 14: company_name "[TEST] Sync Client 01", contact_name "Test Contact", status discovery (Discovery), assigned_to Hammad Developer (id 3), campaign "QA Sync Test", deal_value null, created null, created_by Hammad Developer, app model stage "discovery" owner "Hammad Developer"
+SYNC DONE

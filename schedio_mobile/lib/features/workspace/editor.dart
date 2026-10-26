@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../core/api.dart';
+import '../../core/api_time.dart';
 import '../../core/models.dart';
 import '../../core/providers.dart';
 import '../../core/widgets.dart';
@@ -236,7 +237,7 @@ class _EditorState extends ConsumerState<Editor> {
       context: context,
       initialDate: local,
       firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+      lastDate: DateTime(2199, 12, 31),
     );
     if (day == null || !mounted) return;
     final time = await showTimePicker(
@@ -416,15 +417,15 @@ class _EditorState extends ConsumerState<Editor> {
       payload['timezone'] = zone;
     }
     if ([Module.meetings, Module.events].contains(m)) {
-      payload['start_time'] = apiTime(start!, zone);
-      payload['end_time'] = apiTime(end!, zone);
+      payload['start_time'] = encodeApiTime(start!);
+      payload['end_time'] = encodeApiTime(end!);
     }
     if (m == Module.tasks) {
-      payload['due_date'] = due == null ? null : apiTime(due!, zone);
+      payload['due_date'] = due == null ? null : encodeApiTime(due!);
       payload['meeting_id'] = widget.meetingId ?? widget.record?.meetingId;
     }
     if (m == Module.notes) {
-      payload['follow_up_date'] = due == null ? null : apiTime(due!, zone);
+      payload['follow_up_date'] = due == null ? null : encodeApiTime(due!);
     }
     var path = m.path;
     if (widget.record != null) {

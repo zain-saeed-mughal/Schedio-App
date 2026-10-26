@@ -190,3 +190,14 @@ final calendarProvider = FutureProvider.autoDispose
       ref.watch(authProvider);
       return ref.watch(repositoryProvider).calendar(q.start, q.end);
     });
+
+/// Automatic retry for failed screens: only network failures (no HTTP status)
+/// are retried, up to 3 times, 2, 4 and 6 seconds apart. Server answers such as
+/// 401, 403, 404, 422 or 500 are shown straight away instead of being retried
+/// ten times in a burst (Riverpod's default).
+Duration? schedioRetry(int retryCount, Object error) {
+  if (error is ApiFailure && error.status == null && !error.unsupported && retryCount < 3) {
+    return Duration(seconds: 2 * (retryCount + 1));
+  }
+  return null;
+}
