@@ -709,6 +709,18 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                         ),
                       ),
                     ),
+                  ] else if (r.taskId != null) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: AppButton(
+                        label: 'View task',
+                        trailingIcon: Icons.arrow_forward_rounded,
+                        onPressed: () => openRecord(
+                          context,
+                          Record.fromJson({'id': r.taskId, 'title': 'Task'}, Module.tasks),
+                        ),
+                      ),
+                    ),
                   ],
                 ],
               ),

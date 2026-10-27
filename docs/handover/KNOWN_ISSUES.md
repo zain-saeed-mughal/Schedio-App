@@ -65,3 +65,12 @@ No known release-blocking defects remain in the Android app or in the API featur
 |---|---|---|
 | K-33 | **r9 shows "could not read" on every meeting detail.** Production `GET meetings/{id}` now embeds `notes` as a list of note objects; r9 expects text. Fixed in the working tree (not yet in a release build); see CALENDAR_MEETINGS_FIX_REPORT.md | App, fixed (needs next build) |
 | K-34 | Calendar Hub: "today" followed the phone clock instead of the account timezone; week swipes could jump months after Next/Today; DST days drew events an hour off; the calendar stopped at 1 Jan 2100. Fixed in the working tree | App, fixed (needs next build) |
+
+## Added 2026-10-27 (notifications and reminders)
+
+| # | Issue | Owner |
+|---|---|---|
+| K-35 | **API date-times are now stored 5 hours early.** `19:30+05:00` sent, `14:30+05:00` stored; a save returns `+00:00` and a later read `+05:00`. Fix B of BACKEND_TIMEZONE_FIX.md is live without fix A. See NOTIFICATIONS_REPORT.md §6 | Backend, high |
+| K-25 | Still open: reminder 31 (meeting 29, due 19:30 PKT) stayed pending. Cause confirmed: PostgreSQL session Asia/Karachi vs Laravel UTC. Reminder Engine patch prepared, **not deployed** | Backend, high |
+| K-28 / K-12 | **Resolved 2026-10-27:** inbox, read/unread, mark all read, badge and restart verified on the phone with the real sandbox notification `d75f2da1…` (NOTIFICATIONS_REPORT.md §3) | Done |
+| K-36 | Inbox rows showed no time or kind; task notifications had no "View task"; a push while the app was open did not refresh the inbox | Fixed in the working tree (not in r9/r10) |

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 typedef Json = Map<String, dynamic>;
 
 Json? asMap(Object? value) =>
@@ -21,6 +23,54 @@ int? asInt(Object? value) => switch (value) {
   Map v => asInt(v['id']),
   _ => null,
 };
+
+/// The `data` payload of a Laravel database notification. It is normally an
+/// object, but some serializers send it as a JSON string.
+Json? notificationData(Json j) {
+  final d = j['data'];
+  if (d is Map) return asMap(d);
+  if (d is String && d.trimLeft().startsWith('{')) {
+    try {
+      return asMap(jsonDecode(d));
+    } on FormatException {
+      return null;
+    }
+  }
+  return null;
+}
+
+/// What a notification is about, from `data.category`, `data.type` or the
+/// Laravel notification class (for example `App\Notifications\TaskActivityNotification`).
+enum NotificationKind {
+  reminder('Reminder'),
+  invitation('Invitation'),
+  update('Meeting update'),
+  cancellation('Cancelled'),
+  response('Response'),
+  task('Task'),
+  booking('Booking'),
+  other('Update');
+
+  final String label;
+  const NotificationKind(this.label);
+
+  static NotificationKind of(Json j) {
+    final d = notificationData(j);
+    final hint = [d?['category'], d?['type'], j['type'], j['category']]
+        .map((v) => asText(v)?.toLowerCase() ?? '')
+        .join(' ');
+    if (hint.contains('remind')) return reminder;
+    if (hint.contains('cancel')) return cancellation;
+    if (hint.contains('invit')) return invitation;
+    if (hint.contains('response') || hint.contains('rsvp') || hint.contains('participant')) return response;
+    if (hint.contains('task')) return task;
+    if (hint.contains('booking')) return booking;
+    if (hint.contains('meeting')) return update;
+    if (asInt(d?['task_id']) != null) return task;
+    if (asInt(d?['meeting_id']) != null) return update;
+    return other;
+  }
+}
 
 String? nameOf(Object? value) => switch (value) {
   String v when v.isNotEmpty => v,
@@ -123,6 +173,10 @@ class Record {
   final String? jobTitle, clientName, clientEmail, clientCompany;
   final bool isClientMeeting;
   final int? roomId, departmentId, clientId, assignedTo, meetingId, capacity;
+  /// Task a notification points to (from `data.task_id`).
+  final int? taskId;
+  /// What a notification is about; null for other modules.
+  final NotificationKind? notificationKind;
   final List<Member> participants;
   final List<String> amenities;
   final List<String> attachments;
@@ -154,13 +208,14 @@ class Record {
           asText(j['title']) ??
           asText(j['company_name']) ??
           asText(j['name']) ??
-          asText(asMap(j['data'])?['title']) ??
-          'Meeting note',
+          asText(notificationData(j)?['title']) ??
+          (module == Module.notifications ? 'Notification' : 'Meeting note'),
       status = asText(j['status']) ?? asText(j['approval_status']) ?? '',
       description =
           asText(j['description']) ??
           asText(j['registration_notes']) ??
-          asText(asMap(j['data'])?['message']) ??
+          asText(notificationData(j)?['message']) ??
+          asText(notificationData(j)?['body']) ??
           '',
       start = _date(j['start_time']),
       end = _date(j['end_time']),
@@ -174,7 +229,7 @@ class Record {
       isActive = j['is_active'] != false,
       isCompanyWide = j['is_company_wide'] == true,
       isAllDay = j['is_all_day'] == true,
-      isRead = j['read_at'] != null,
+      isRead = j['read_at'] != null || j['is_read'] == true,
       timezone = asText(j['timezone']),
       type = asText(j['type']),
       location = asText(j['location']),
@@ -209,7 +264,11 @@ class Record {
       departmentId = asInt(j['department_id'] ?? j['department']),
       clientId = asInt(j['client_id'] ?? j['client']),
       assignedTo = asInt(j['assigned_to'] ?? j['assignee']),
-      meetingId = asInt(j['meeting_id']) ?? asInt(asMap(j['data'])?['meeting_id']),
+      meetingId = asInt(j['meeting_id']) ??
+          asInt(notificationData(j)?['meeting_id']) ??
+          asInt(asMap(notificationData(j)?['payload'])?['meeting_id']),
+      taskId = module == Module.notifications ? asInt(notificationData(j)?['task_id']) : null,
+      notificationKind = module == Module.notifications ? NotificationKind.of(j) : null,
       capacity = asInt(j['capacity']),
       participants = [
         for (final p in j['participants'] is List ? j['participants'] as List : const [])

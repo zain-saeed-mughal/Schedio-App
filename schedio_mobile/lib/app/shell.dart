@@ -80,8 +80,10 @@ class _WorkspaceShellState extends ConsumerState<WorkspaceShell>
     startPolling();
     final push = ref.read(pushServiceProvider)
       ..onOpen = openFromPush
+      // A push while the app is open: refresh the inbox, badge and lists
+      // so a new persistent notification shows without a manual refresh.
       ..onForeground = (message) {
-        ref.invalidate(dashboardProvider);
+        ref.read(refreshProvider.notifier).refresh();
       };
     unawaited(push.start().catchError((Object e) {
       debugPrint('Schedio push registration failed (${e.runtimeType}: ${e is ApiFailure ? 'HTTP ${e.status} ${e.message}' : e})');
@@ -97,7 +99,13 @@ class _WorkspaceShellState extends ConsumerState<WorkspaceShell>
         ref
             .read(apiProvider)
             .request('notifications/$id/read', method: 'PATCH')
-            .then<void>((_) {}, onError: (Object _) {}),
+            // Refresh again once the server has it, so the badge drops.
+            .then<void>(
+              (_) {
+                if (mounted) ref.read(refreshProvider.notifier).refresh();
+              },
+              onError: (Object _) {},
+            ),
       );
     }
     pushScreen(context, screenForPush(message));

@@ -44,6 +44,31 @@ String dateLabel(DateTime? value, String timezone) {
 String timeLabel(DateTime? value, String timezone) =>
     value == null ? '' : DateFormat('h:mm a').format(localIn(value, timezone));
 
+/// When a notification arrived, in the account's timezone: "Today, 3:05 PM",
+/// "Yesterday, 9:00 AM", "Oct 20, 9:00 AM" or "Dec 30, 2025, 9:00 AM".
+String notificationTime(DateTime? value, String timezone, {DateTime? now}) {
+  if (value == null) return '';
+  final local = localIn(value, timezone);
+  final today = localIn(now ?? DateTime.now(), timezone);
+  final day = DateTime.utc(local.year, local.month, local.day);
+  final diff = DateTime.utc(today.year, today.month, today.day).difference(day).inDays;
+  final time = DateFormat('h:mm a').format(local);
+  if (diff == 0) return 'Today, $time';
+  if (diff == 1) return 'Yesterday, $time';
+  return '${DateFormat(local.year == today.year ? 'MMM d' : 'MMM d, y').format(local)}, $time';
+}
+
+IconData notificationIcon(NotificationKind kind) => switch (kind) {
+  NotificationKind.reminder => Icons.alarm_rounded,
+  NotificationKind.invitation => Icons.event_available_rounded,
+  NotificationKind.update => Icons.edit_calendar_rounded,
+  NotificationKind.cancellation => Icons.event_busy_rounded,
+  NotificationKind.response => Icons.how_to_reg_rounded,
+  NotificationKind.task => Icons.task_alt_rounded,
+  NotificationKind.booking => Icons.calendar_month_rounded,
+  NotificationKind.other => Icons.notifications_none_rounded,
+};
+
 String dayHeader(DateTime value) => DateFormat('EEEE, MMM d').format(value);
 
 String shortDay(DateTime? value, String timezone) =>
@@ -165,7 +190,7 @@ class RecordTile extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: switch (record.module) {
-      Module.notifications => _NotificationRow(record: record, onTap: onTap),
+      Module.notifications => _NotificationRow(record: record, timezone: timezone, onTap: onTap),
       _ => GlassCard(
         onTap: onTap,
         padding: const EdgeInsets.all(16),
@@ -508,13 +533,16 @@ Tint eventTint(String? category) => switch (category) {
 
 class _NotificationRow extends StatelessWidget {
   final Record record;
+  final String timezone;
   final VoidCallback onTap;
-  const _NotificationRow({required this.record, required this.onTap});
+  const _NotificationRow({required this.record, required this.timezone, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final r = record;
     final unread = !r.isRead;
+    final kind = r.notificationKind ?? NotificationKind.other;
+    final when = notificationTime(r.created, timezone);
     return Opacity(
       opacity: unread ? 1 : 0.7,
       child: PressableRow(
@@ -550,6 +578,22 @@ class _NotificationRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Row(
+                    children: [
+                      Icon(notificationIcon(kind), size: 13, color: unread ? AppColors.amber400 : AppColors.slate500),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          [kind.label.toUpperCase(), if (when.isNotEmpty) when].join('  ·  '),
+                          key: const ValueKey('notification-meta'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.monoTiny,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
                   Text(
                     r.title,
                     style: AppText.helper.copyWith(

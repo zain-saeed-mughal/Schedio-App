@@ -25,10 +25,14 @@ class PushMessage {
       return v == null || '$v'.isEmpty ? null : '$v';
     }
 
+    final type = text('type') ?? text('category');
+    final isTask = type?.toLowerCase().contains('task') ?? false;
     return PushMessage(
       notificationId: text('notification_id'),
-      type: text('type'),
-      targetId: text('meeting_id') ?? text('task_id') ?? text('target_id'),
+      type: type,
+      targetId: isTask
+          ? text('task_id') ?? text('target_id')
+          : text('meeting_id') ?? text('task_id') ?? text('target_id'),
       title: title ?? text('title'),
       body: body ?? text('body'),
     );
