@@ -252,6 +252,19 @@ class ClientController extends Controller
         $oldStatus = $client->status;
         $newStatus = $validated['status'];
 
+        if ($newStatus === Client::STATUS_SCHEDULED && $oldStatus === Client::STATUS_DISCOVERY) {
+            $hasScheduledMeeting = $client->meetings()->where('status', 'scheduled')->exists();
+            if (!$hasScheduledMeeting) {
+                if ($request->wantsJson() || $request->ajax()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Scheduling a meeting is required to advance a deal from Discovery to Scheduled.',
+                    ], 422);
+                }
+                return back()->with('error', 'Scheduling a meeting is required to advance a deal from Discovery to Scheduled.');
+            }
+        }
+
         $updateData = [
             'status' => $newStatus,
             'last_activity_at' => now(),

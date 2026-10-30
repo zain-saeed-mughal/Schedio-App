@@ -14,8 +14,8 @@
             </h1>
             <p class="text-xs text-slate-400">Schedule meetings for existing BD pipeline clients in 1-click, or create a custom appointment manually with automated reminders.</p>
         </div>
-        <a href="{{ route('meetings.index') }}" class="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition-colors">
-            &larr; Back to Meetings
+        <a href="{{ request('return_to', old('return_to', route('meetings.index'))) }}" class="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition-colors">
+            &larr; Back to {{ (request('return_to') && str_contains(request('return_to'), 'clients')) || (old('return_to') && str_contains(old('return_to'), 'clients')) ? 'Client / Pipeline' : 'Meetings' }}
         </a>
     </div>
 
@@ -30,8 +30,9 @@
         </div>
     @endif
 
-    <form action="{{ route('meetings.store') }}" method="POST" class="glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl space-y-7 border border-white/[0.08]">
+    <form action="{{ route('meetings.store') }}" method="POST" @submit="if(isSubmitting) { $event.preventDefault(); return; } isSubmitting = true" class="glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl space-y-7 border border-white/[0.08]">
         @csrf
+        <input type="hidden" name="return_to" value="{{ request('return_to', old('return_to', '')) }}">
 
         <!-- MODE SELECTION: TWO CLEAR WAYS TO SCHEDULE -->
         <div class="p-4 rounded-2xl bg-slate-950/70 border border-white/[0.08] space-y-3">
@@ -286,11 +287,11 @@
 
         <!-- Submit Actions -->
         <div class="flex items-center justify-end gap-3 pt-4 border-t border-white/[0.08]">
-            <a href="{{ route('meetings.index') }}" class="px-5 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 text-xs font-semibold border border-white/10 transition-all">
+            <a href="{{ request('return_to', old('return_to', route('meetings.index'))) }}" class="px-5 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 text-xs font-semibold border border-white/10 transition-all">
                 Cancel
             </a>
-            <button type="submit" class="btn-amber px-6 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-amber-500/20 cursor-pointer">
-                Confirm & Schedule Meeting
+            <button type="submit" :disabled="isSubmitting" class="btn-amber px-6 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-amber-500/20 cursor-pointer disabled:opacity-50">
+                <span x-text="isSubmitting ? 'Scheduling...' : 'Confirm & Schedule Meeting'">Confirm & Schedule Meeting</span>
             </button>
         </div>
     </form>
@@ -302,6 +303,7 @@ document.addEventListener('alpine:init', () => {
     const clientsList = @json($clients ?? []);
 
     Alpine.data('meetingScheduler', () => ({
+        isSubmitting: false,
         schedulingMode: '{{ request('client_id') ? "existing" : "manual" }}',
         meetingType: 'virtual',
         meetingTitle: '{{ old('title', '') }}',

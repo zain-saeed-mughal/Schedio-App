@@ -46,6 +46,7 @@ class Editor extends ConsumerStatefulWidget {
   final Record? record;
   final String? meetingId;
   final int? clientId;
+  final Record? clientRecord;
   final DateTime? initialStart;
   const Editor({
     super.key,
@@ -53,6 +54,7 @@ class Editor extends ConsumerStatefulWidget {
     this.record,
     this.meetingId,
     this.clientId,
+    this.clientRecord,
     this.initialStart,
   });
   @override
@@ -100,6 +102,8 @@ class _EditorState extends ConsumerState<Editor> {
   void initState() {
     super.initState();
     final r = widget.record;
+    final cRec = widget.clientRecord;
+    final effectiveClientId = widget.clientId ?? (cRec != null ? int.tryParse(cRec.id) : null);
     start = r?.start ?? widget.initialStart;
     end = r?.end ?? widget.initialStart?.add(const Duration(minutes: 30));
     due = r?.due;
@@ -110,10 +114,10 @@ class _EditorState extends ConsumerState<Editor> {
       'category': r?.category ?? 'general',
       'room_id': r?.roomId,
       'department_id': r?.departmentId,
-      'client_id': r?.clientId ?? widget.clientId,
+      'client_id': effectiveClientId,
       'assigned_to': r?.assignedTo,
       'is_private': r?.isPrivate ?? false,
-      'is_client_meeting': r?.isClientMeeting ?? false,
+      'is_client_meeting': r?.isClientMeeting ?? (effectiveClientId != null),
       'save_as_client': false,
       'is_active': r?.isActive ?? true,
       'is_company_wide': r?.isCompanyWide ?? false,
@@ -123,11 +127,11 @@ class _EditorState extends ConsumerState<Editor> {
     });
     participantIds.addAll(r?.participants.map((p) => p.id) ?? []);
     final initial = {
-      'title': r?.title,
-      'client_name': r?.clientName,
-      'client_email': r?.clientEmail,
-      'client_company': r?.clientCompany,
-      'description': r?.description,
+      'title': r?.title ?? (cRec != null ? 'Pitch & Demo Call: ${cRec.title}' : null),
+      'client_name': r?.clientName ?? cRec?.contactName,
+      'client_email': r?.clientEmail ?? cRec?.contactEmail,
+      'client_company': r?.clientCompany ?? cRec?.title,
+      'description': r?.description ?? (cRec != null && cRec.progress != null ? cRec.progress : null),
       'location': r?.location,
       'meeting_link': r?.meetingLink,
       'company_name': r?.title,
@@ -201,7 +205,7 @@ class _EditorState extends ConsumerState<Editor> {
         onChanged: (v) => values[key] = v,
       );
 
-  Widget lookup(String key, String title, List<Member> options, {Color? labelColor}) =>
+  Widget lookup(String key, String title, List<Member> options, {Color? labelColor, ValueChanged<int?>? onChanged}) =>
       AppDropdown<int>(
         label: title,
         labelColor: labelColor,
@@ -214,7 +218,10 @@ class _EditorState extends ConsumerState<Editor> {
             (m) => DropdownMenuItem(value: m.id, child: Text(m.name)),
           ),
         ],
-        onChanged: (v) => values[key] = v,
+        onChanged: (v) {
+          values[key] = v;
+          onChanged?.call(v);
+        },
       );
 
   Widget toggle(String key, String title, {String? subtitle, IconData? icon}) =>
@@ -504,7 +511,26 @@ class _EditorState extends ConsumerState<Editor> {
             subtitle: 'Invite someone from outside your workspace',
             icon: Icons.person_add_alt_outlined,
           ),
-          lookup('client_id', 'Client', l.clients, labelColor: AppColors.purple300),
+          lookup(
+            'client_id',
+            'Client',
+            l.clients,
+            labelColor: AppColors.purple300,
+            onChanged: (v) {
+              if (v != null) {
+                final cl = l.clients.where((c) => c.id == v).firstOrNull;
+                if (cl != null) {
+                  final cur = fields['title']?.text ?? '';
+                  if (cur.isEmpty || cur.startsWith('Pitch & Demo Call:')) {
+                    fields['title']?.text = 'Pitch & Demo Call: ${cl.name}';
+                  }
+                  if (fields['client_company']?.text.isEmpty ?? true) {
+                    fields['client_company']?.text = cl.name;
+                  }
+                }
+              }
+            },
+          ),
           if (values['is_client_meeting'] == true) ...[
             text('client_name', 'Guest name', labelColor: AppColors.purple300),
             text(

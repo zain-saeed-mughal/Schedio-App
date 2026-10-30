@@ -45,9 +45,30 @@ class _PipelineScreenState extends ConsumerState<PipelineScreen> {
   final overrides = <String, String>{};
   String? dropTarget;
 
+  Future<void> scheduleAndMove(Record r) async {
+    final created = await openEditor(
+      context,
+      Module.meetings,
+      clientId: int.tryParse(r.id),
+      clientRecord: r,
+    );
+    if (created == true && mounted) {
+      ref.read(refreshProvider.notifier).refresh();
+      await Future.wait([
+        ref.read(stageProvider((stage: 'discovery', search: search)).future),
+        ref.read(stageProvider((stage: 'scheduled', search: search)).future),
+      ]);
+      if (mounted) setState(() => overrides.remove(r.id));
+    }
+  }
+
   Future<void> move(Record r, String stage, {Json extra = const {}}) async {
     final from = overrides[r.id] ?? r.status;
     if (from == stage && extra.isEmpty) return;
+    if (from == 'discovery' && stage == 'scheduled') {
+      await scheduleAndMove(r);
+      return;
+    }
     setState(() => overrides[r.id] = stage);
     try {
       await ref

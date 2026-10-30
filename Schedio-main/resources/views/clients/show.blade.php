@@ -29,11 +29,11 @@
         </a>
 
         <div class="flex items-center gap-2">
-            <button @click="openScheduleModal = true"
+            <a href="{{ route('meetings.create', ['client_id' => $client->id, 'return_to' => route('clients.show', $client)]) }}"
                 class="btn-amber px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                 <span>Schedule Meeting</span>
-            </button>
+            </a>
 
             <button @click="openEditModal = true"
                 class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition-all">
@@ -109,20 +109,28 @@
             <div class="bg-slate-950/70 border border-white/[0.08] p-4 rounded-2xl space-y-2 shrink-0 min-w-[220px]">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Move Deal Stage</span>
                 @if ($client->next_status)
-                    <form action="{{ route('clients.update-status', $client) }}" method="POST">
-                        @csrf
-                        @method('PATCH')
-                        <input type="hidden" name="status" value="{{ $client->next_status }}">
-                        <button type="submit" class="w-full py-2 px-3 rounded-xl text-xs font-black bg-amber-400 text-slate-950 hover:bg-amber-300 transition-all shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 cursor-pointer">
+                    @if ($client->status === \App\Models\Client::STATUS_DISCOVERY && $client->next_status === \App\Models\Client::STATUS_SCHEDULED)
+                        <a href="{{ route('meetings.create', ['client_id' => $client->id, 'return_to' => route('clients.show', $client)]) }}"
+                            class="w-full py-2 px-3 rounded-xl text-xs font-black bg-amber-400 text-slate-950 hover:bg-amber-300 transition-all shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 cursor-pointer">
                             <span>{{ $client->next_action_label }}</span>
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
-                        </button>
-                    </form>
+                        </a>
+                    @else
+                        <form action="{{ route('clients.update-status', $client) }}" method="POST">
+                            @csrf
+                            @method('PATCH')
+                            <input type="hidden" name="status" value="{{ $client->next_status }}">
+                            <button type="submit" class="w-full py-2 px-3 rounded-xl text-xs font-black bg-amber-400 text-slate-950 hover:bg-amber-300 transition-all shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 cursor-pointer">
+                                <span>{{ $client->next_action_label }}</span>
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
+                            </button>
+                        </form>
+                    @endif
                 @endif
                 <form action="{{ route('clients.update-status', $client) }}" method="POST">
                     @csrf
                     @method('PATCH')
-                    <select name="status" onchange="this.form.submit()"
+                    <select name="status" onchange="if ('{{ $client->status }}' === 'discovery' && this.value === 'scheduled') { window.location.href = '{{ route('meetings.create', ['client_id' => $client->id, 'return_to' => route('clients.show', $client)]) }}'; } else { this.form.submit(); }"
                         class="w-full px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer border focus:ring-2 focus:ring-amber-400"
                         style="{{ $client->status_meta['badge_style'] }}">
                         @foreach (\App\Models\Client::STATUSES as $optKey => $optMeta)
@@ -187,11 +195,11 @@
                         </div>
                     </div>
 
-                    <button @click="openScheduleModal = true"
+                    <a href="{{ route('meetings.create', ['client_id' => $client->id, 'return_to' => route('clients.show', $client)]) }}"
                         class="btn-amber px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 shadow-md shadow-amber-500/20 cursor-pointer">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
                         <span>+ Schedule Call</span>
-                    </button>
+                    </a>
                 </div>
 
                 @if ($client->meetings->isEmpty())
@@ -203,9 +211,9 @@
                         <p class="text-[11px] text-slate-500 max-w-sm mx-auto">
                             Schedule a discovery call or product demo. Reminders will be armed automatically.
                         </p>
-                        <button @click="openScheduleModal = true" class="btn-amber px-4 py-2 rounded-xl text-xs font-bold shadow-md">
+                        <a href="{{ route('meetings.create', ['client_id' => $client->id, 'return_to' => route('clients.show', $client)]) }}" class="btn-amber px-4 py-2 rounded-xl text-xs font-bold shadow-md">
                             Schedule First Call
-                        </button>
+                        </a>
                     </div>
                 @else
                     <div class="space-y-3">

@@ -45,6 +45,7 @@ class BrandLogo extends StatelessWidget {
             height: size,
             filterQuality: FilterQuality.high,
             gaplessPlayback: true,
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
           ),
         ],
       ),

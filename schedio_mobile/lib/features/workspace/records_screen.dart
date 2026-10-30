@@ -9,21 +9,25 @@ import '../settings/settings_screen.dart';
 import 'editor.dart';
 import 'registration_queue.dart';
 
-void openEditor(
+Future<bool?> openEditor(
   BuildContext context,
   Module module, {
   Record? record,
   String? meetingId,
   int? clientId,
+  Record? clientRecord,
+  DateTime? initialStart,
 }) {
-  Navigator.push(
+  return Navigator.push<bool>(
     context,
-    MaterialPageRoute<void>(
+    MaterialPageRoute<bool>(
       builder: (_) => Editor(
         module: module,
         record: record,
         meetingId: meetingId,
-        clientId: clientId,
+        clientId: clientId ?? (clientRecord != null ? int.tryParse(clientRecord.id) : null),
+        clientRecord: clientRecord,
+        initialStart: initialStart,
       ),
     ),
   );
@@ -621,7 +625,17 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                       title: 'Schedule client meeting',
                       subtitle: 'Book time with ${r.contactName ?? r.title}',
                       trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.slate500),
-                      onTap: () => openEditor(context, Module.meetings, clientId: int.parse(r.id)),
+                      onTap: () async {
+                        final created = await openEditor(
+                          context,
+                          Module.meetings,
+                          clientId: int.tryParse(r.id),
+                          clientRecord: r,
+                        );
+                        if (created == true && context.mounted) {
+                          ref.read(refreshProvider.notifier).refresh();
+                        }
+                      },
                     ),
                     DetailRow(
                       icon: Icons.history_rounded,
@@ -674,7 +688,21 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
                             dot: r.module == Module.clients ? StageStyle.of(s).dot : null,
                             onTap: busy || r.status == s
                                 ? () {}
-                                : () => action('$path/status', data: {'status': s}, message: 'Status updated'),
+                                : () async {
+                                    if (r.module == Module.clients && r.status == 'discovery' && s == 'scheduled') {
+                                      final created = await openEditor(
+                                        context,
+                                        Module.meetings,
+                                        clientId: int.tryParse(r.id),
+                                        clientRecord: r,
+                                      );
+                                      if (created == true && context.mounted) {
+                                        ref.read(refreshProvider.notifier).refresh();
+                                      }
+                                      return;
+                                    }
+                                    action('$path/status', data: {'status': s}, message: 'Status updated');
+                                  },
                           ),
                       ],
                     ),

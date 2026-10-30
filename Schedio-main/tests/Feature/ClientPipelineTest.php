@@ -273,4 +273,122 @@ class ClientPipelineTest extends TestCase
         $this->assertNotNull($meeting);
         $this->assertEquals($createdClient->id, $meeting->client_id);
     }
+
+    public function test_direct_status_change_from_discovery_to_scheduled_without_meeting_is_rejected(): void
+    {
+        $client = Client::create([
+            'company_name' => 'Acme Discovery Corp',
+            'contact_name' => 'Alice Discovery',
+            'status' => Client::STATUS_DISCOVERY,
+            'created_by' => $this->user->id,
+            'assigned_to' => $this->user->id,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->json('PATCH', route('clients.update-status', $client), [
+                'status' => Client::STATUS_SCHEDULED,
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJson([
+            'success' => false,
+            'message' => 'Scheduling a meeting is required to advance a deal from Discovery to Scheduled.',
+        ]);
+
+        $this->assertEquals(Client::STATUS_DISCOVERY, $client->fresh()->status);
+    }
+
+    public function test_meeting_creation_links_client_and_advances_discovery_to_scheduled(): void
+    {
+        $client = Client::create([
+            'company_name' => 'Solaria Solar',
+            'contact_name' => 'Elena Solaria',
+            'status' => Client::STATUS_DISCOVERY,
+            'created_by' => $this->user->id,
+            'assigned_to' => $this->user->id,
+        ]);
+
+        $startTime = now()->addDays(1)->setHour(10)->setMinute(0);
+        $endTime = now()->addDays(1)->setHour(11)->setMinute(0);
+
+        $response = $this->actingAs($this->user)
+            ->post(route('meetings.store'), [
+                'title' => 'Pitch & Demo Call: Solaria Solar',
+                'client_id' => $client->id,
+                'start_time' => $startTime->format('Y-m-d H:i:s'),
+                'end_time' => $endTime->format('Y-m-d H:i:s'),
+                'timezone' => 'UTC',
+                'type' => 'virtual',
+                'reminder_minutes' => 15,
+                'return_to' => route('clients.show', $client),
+            ]);
+
+        $response->assertRedirect(route('clients.show', $client));
+        $this->assertEquals(Client::STATUS_SCHEDULED, $client->fresh()->status);
+
+        $meeting = Meeting::where('client_id', $client->id)->first();
+        $this->assertNotNull($meeting);
+        $this->assertEquals('scheduled', $meeting->status);
+        $this->assertTrue($client->meetings()->where('status', 'scheduled')->exists());
+    }
+
+    public function test_failed_meeting_creation_preserves_discovery_stage(): void
+    {
+        $client = Client::create([
+            'company_name' => 'Preserved Discovery Co',
+            'contact_name' => 'Peter Preserved',
+            'status' => Client::STATUS_DISCOVERY,
+            'created_by' => $this->user->id,
+            'assigned_to' => $this->user->id,
+        ]);
+
+        // Attempt invalid meeting (end_time before start_time)
+        $startTime = now()->addDays(1)->setHour(11)->setMinute(0);
+        $endTime = now()->addDays(1)->setHour(10)->setMinute(0);
+
+        $response = $this->actingAs($this->user)
+            ->post(route('meetings.store'), [
+                'title' => 'Invalid Call',
+                'client_id' => $client->id,
+                'start_time' => $startTime->format('Y-m-d H:i:s'),
+                'end_time' => $endTime->format('Y-m-d H:i:s'),
+                'timezone' => 'UTC',
+                'type' => 'virtual',
+            ]);
+
+        $response->assertSessionHasErrors(['end_time']);
+        $this->assertEquals(Client::STATUS_DISCOVERY, $client->fresh()->status);
+        $this->assertEquals(0, Meeting::where('client_id', $client->id)->count());
+    }
+
+    public function test_api_meeting_creation_links_client_and_advances_discovery_to_scheduled(): void
+    {
+        $client = Client::create([
+            'company_id' => $this->user->company_id,
+            'company_name' => 'API Discovery Co',
+            'contact_name' => 'Alex API',
+            'status' => Client::STATUS_DISCOVERY,
+            'created_by' => $this->user->id,
+            'assigned_to' => $this->user->id,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->postJson('/api/v1/meetings', [
+                'title' => 'API Pitch: Discovery Co',
+                'client_id' => $client->id,
+                'start_time' => '2030-10-22T10:00:00Z',
+                'end_time' => '2030-10-22T11:00:00Z',
+                'timezone' => 'UTC',
+                'type' => 'virtual',
+                'reminder_minutes' => 15,
+            ]);
+
+        $response->assertCreated();
+        $this->assertEquals(Client::STATUS_SCHEDULED, $client->fresh()->status);
+        $this->assertDatabaseHas('meetings', [
+            'client_id' => $client->id,
+            'title' => 'API Pitch: Discovery Co',
+            'status' => 'scheduled',
+        ]);
+    }
 }

@@ -37,6 +37,7 @@
 
 <div class="w-full max-w-[1700px] mx-auto space-y-6" x-data="{
     currentView: 'board', // 'board' or 'sheet'
+    allClients: @json($allClients),
     openNewClientModal: false,
     openScheduleModal: false,
     openShiftModal: false,
@@ -57,13 +58,17 @@
     },
 
     openScheduleFor(client) {
-        this.selectedClient = client;
-        this.openScheduleModal = true;
+        window.location.href = `/meetings/create?client_id=${client.id}&return_to=${encodeURIComponent(window.location.href)}`;
     },
 
     openShiftModalFor(client, targetStage) {
+        const target = targetStage || client.next_status || 'scheduled';
+        if (client && client.status === 'discovery' && target === 'scheduled') {
+            window.location.href = `/meetings/create?client_id=${client.id}&return_to=${encodeURIComponent(window.location.href)}`;
+            return;
+        }
         this.selectedClient = client;
-        this.targetStatus = targetStage || client.next_status || 'scheduled';
+        this.targetStatus = target;
         this.shiftProgress = client.progress || '';
         this.shiftDealValue = client.deal_value || '';
         this.shiftNotes = '';
@@ -93,6 +98,12 @@
         this.dragOverStatus = null;
         const clientId = event.dataTransfer.getData('text/plain') || this.draggingClientId;
         if (!clientId) return;
+        const client = this.allClients?.find?.(c => c.id == clientId);
+        if (newStatus === 'scheduled' && client && client.status === 'discovery') {
+            window.location.href = `/meetings/create?client_id=${clientId}&return_to=${encodeURIComponent(window.location.href)}`;
+            this.draggingClientId = null;
+            return;
+        }
         this.quickUpdateStatus(clientId, newStatus);
         this.draggingClientId = null;
     },
@@ -103,6 +114,11 @@
     },
 
     quickUpdateStatus(clientId, newStatus, progress = null, dealValue = null, notes = null) {
+        const client = this.allClients?.find?.(c => c.id == clientId);
+        if (newStatus === 'scheduled' && client && client.status === 'discovery') {
+            window.location.href = `/meetings/create?client_id=${clientId}&return_to=${encodeURIComponent(window.location.href)}`;
+            return;
+        }
         const payload = { status: newStatus };
         if (progress !== null) payload.progress = progress;
         if (dealValue !== null) payload.deal_value = dealValue;
@@ -139,6 +155,10 @@
 
     submitShiftModal() {
         if (!this.selectedClient) return;
+        if (this.selectedClient.status === 'discovery' && this.targetStatus === 'scheduled') {
+            window.location.href = `/meetings/create?client_id=${this.selectedClient.id}&return_to=${encodeURIComponent(window.location.href)}`;
+            return;
+        }
         this.quickUpdateStatus(
             this.selectedClient.id,
             this.targetStatus,

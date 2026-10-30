@@ -171,9 +171,20 @@ class MeetingController extends Controller
             if (!empty($validated['client_id'])) {
                 $client = Client::find($validated['client_id']);
                 if ($client && $client->status === Client::STATUS_DISCOVERY) {
+                    $oldStatus = $client->status;
                     $client->update([
                         'status' => Client::STATUS_SCHEDULED,
+                        'progress' => "Meeting scheduled for {$startTime->format('M d, Y h:i A')}. Automatic reminders active.",
                         'last_activity_at' => now(),
+                    ]);
+                    AuditLog::create([
+                        'user_id' => $user->id,
+                        'action' => 'client_status_changed',
+                        'auditable_type' => Client::class,
+                        'auditable_id' => $client->id,
+                        'description' => "Pipeline stage for '{$client->company_name}' advanced from Discovery to Scheduled via meeting scheduling by {$user->name}.",
+                        'old_values' => ['status' => $oldStatus],
+                        'new_values' => ['status' => Client::STATUS_SCHEDULED, 'progress' => $client->progress],
                     ]);
                 }
             } elseif (!empty($request->boolean('save_as_client')) && !empty($validated['client_company'])) {
@@ -238,6 +249,10 @@ class MeetingController extends Controller
 
             return $meeting;
         });
+
+        if ($request->filled('return_to')) {
+            return redirect($request->input('return_to'))->with('success', 'Meeting scheduled successfully and deal stage advanced to Scheduled.');
+        }
 
         return redirect()->route('meetings.show', $meeting)->with('success', 'Meeting scheduled successfully.');
     }

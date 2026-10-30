@@ -103,8 +103,24 @@ class MeetingController extends Controller
                     ->update(['status' => 'dismissed']);
             }
             if ($meeting->client_id) {
-                Client::whereKey($meeting->client_id)->where('status', 'discovery')
-                    ->update(['status' => 'scheduled', 'last_activity_at' => now()]);
+                $client = Client::whereKey($meeting->client_id)->lockForUpdate()->first();
+                if ($client && $client->status === Client::STATUS_DISCOVERY) {
+                    $oldStatus = $client->status;
+                    $client->update([
+                        'status' => Client::STATUS_SCHEDULED,
+                        'progress' => "Meeting scheduled for {$start->format('M d, Y h:i A')}. Automatic reminders active.",
+                        'last_activity_at' => now(),
+                    ]);
+                    AuditLog::create([
+                        'user_id' => $u->id,
+                        'action' => 'client_status_changed',
+                        'auditable_type' => Client::class,
+                        'auditable_id' => $client->id,
+                        'description' => "Pipeline stage for '{$client->company_name}' advanced from Discovery to Scheduled via meeting scheduling by {$u->name}.",
+                        'old_values' => ['status' => $oldStatus],
+                        'new_values' => ['status' => Client::STATUS_SCHEDULED, 'progress' => $client->progress],
+                    ]);
+                }
             }
             $reminders = app(ReminderEngineService::class);
             if ($oldStart && ! $oldStart->equalTo($start)) { $reminders->handleMeetingRescheduled($meeting, $oldStart); }
